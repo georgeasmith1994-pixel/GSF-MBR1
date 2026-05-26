@@ -1236,15 +1236,7 @@ export default function App() {
                 </div>
                 <div className="mt-10 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5 text-sm text-amber-900 flex shadow-sm">
                   <AlertTriangle className="w-6 h-6 mr-4 shrink-0 text-amber-500" />
-                  <div>
-                    <p className="font-bold mb-1">Logging Discrepancy Note</p>
-                    <p className="leading-relaxed">
-                      P2 (Urgent) shows 0% due to an agreed logging discrepancy
-                      where fob orders and CCTV takeovers were mistakenly logged
-                      as 4-hour emergency criteria. Retained as 0% for GSF
-                      training reflection.
-                    </p>
-                  </div>
+                  <div></div>
                 </div>
               </div>
             </div>
