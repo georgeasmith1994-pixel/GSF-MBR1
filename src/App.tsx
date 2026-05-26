@@ -686,8 +686,12 @@ export default function App() {
           <div className="space-y-8 animate-[fadeIn_0.5s_ease-out]">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card
-                title="Total Spend (Apr)"
-                value={formatMoney(spendData[spendData.length - 1].total)}
+                title={`Total Spend (${
+                  latestSpendData ? latestSpendData.month.split("-")[0] : "N/A"
+                })`}
+                value={
+                  latestSpendData ? formatMoney(latestSpendData.total) : "£0"
+                }
                 subtext="▼ Down from Last Mo."
                 icon={DollarSign}
                 gradientFrom="from-blue-50"
@@ -779,10 +783,11 @@ export default function App() {
                         tickLine={false}
                         tick={{
                           fill: "#64748b",
-                          fontSize: 13,
+                          fontSize: 11,
                           fontWeight: 600,
                         }}
                         dy={10}
+                        interval={0}
                       />
                       <YAxis
                         tickFormatter={(val) => "£" + val / 1000 + "k"}
@@ -986,10 +991,11 @@ export default function App() {
                     />
                     <XAxis
                       dataKey="month"
-                      tick={{ fill: "#64748b", fontWeight: 600, fontSize: 13 }}
+                      tick={{ fill: "#64748b", fontWeight: 600, fontSize: 11 }}
                       axisLine={false}
                       tickLine={false}
                       dy={15}
+                      interval={0}
                     />
                     <YAxis
                       tickFormatter={(val) => "£" + val / 1000 + "k"}
@@ -1294,11 +1300,12 @@ export default function App() {
                         tick={{
                           fill: "#64748b",
                           fontWeight: 600,
-                          fontSize: 13,
+                          fontSize: 11,
                         }}
                         axisLine={false}
                         tickLine={false}
                         dy={10}
+                        interval={0}
                       />
                       <YAxis
                         yAxisId="left"
