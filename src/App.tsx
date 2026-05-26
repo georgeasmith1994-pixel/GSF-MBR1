@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   AreaChart,
   Area,
@@ -31,6 +31,14 @@ import {
   Upload,
   Download,
 } from "lucide-react";
+
+// Dynamically import xlsx for Excel handling
+let XLSX: any = null;
+if (typeof window !== "undefined") {
+  import("xlsx").then((mod) => {
+    XLSX = mod;
+  });
+}
 
 // --- DATA ---
 const defaultData = {
@@ -343,6 +351,10 @@ const Card = ({
 // --- MAIN APP ---
 export default function App() {
   const [activeTab, setActiveTab] = useState("executive");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize data as state for dynamic updates
+  const [data, setData] = useState(() => defaultData);
 
   const {
     spendData,
@@ -353,12 +365,133 @@ export default function App() {
     topReactiveBranches2026,
     topIntruderBranches,
     cxFeedbackLog,
-  } = defaultData;
+  } = data;
 
   const downloadTemplate = () => {
-    alert(
-      "This would download the Excel template in a production environment."
-    );
+    if (!XLSX) {
+      alert("xlsx library not loaded. Please install it: npm install xlsx");
+      return;
+    }
+
+    try {
+      const workbook = XLSX.utils.book_new();
+
+      // Add each data sheet
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(spendData),
+        "Spend Data"
+      );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(aprilSpendBreakdown),
+        "April Breakdown"
+      );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(intruder2026),
+        "Intruder 2026"
+      );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(slaPerformance),
+        "SLA Performance"
+      );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(ppmBreakdown),
+        "PPM Breakdown"
+      );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(topReactiveBranches2026),
+        "Top Reactive"
+      );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(topIntruderBranches),
+        "Top Intruder"
+      );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(cxFeedbackLog),
+        "CX Feedback"
+      );
+
+      // Generate filename with timestamp
+      const now = new Date();
+      const timestamp = now.toISOString().split("T")[0];
+      const filename = `GSF_BusinessReview_Template_${timestamp}.xlsx`;
+
+      // Write file
+      XLSX.writeFile(workbook, filename);
+    } catch (error) {
+      console.error("Error downloading template:", error);
+      alert("Error downloading template. Check console for details.");
+    }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!XLSX) {
+      alert("xlsx library not loaded. Please install it: npm install xlsx");
+      return;
+    }
+
+    try {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: "binary" });
+
+        const sheetNames = workbook.SheetNames;
+        const newData: any = { ...data };
+
+        // Map sheet names to data keys
+        const sheetMap: { [key: string]: string } = {
+          "Spend Data": "spendData",
+          "April Breakdown": "aprilSpendBreakdown",
+          "Intruder 2026": "intruder2026",
+          "SLA Performance": "slaPerformance",
+          "PPM Breakdown": "ppmBreakdown",
+          "Top Reactive": "topReactiveBranches2026",
+          "Top Intruder": "topIntruderBranches",
+          "CX Feedback": "cxFeedbackLog",
+        };
+
+        for (const sheetName of sheetNames) {
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+          const dataKey = sheetMap[sheetName];
+          if (dataKey && jsonData.length > 0) {
+            newData[dataKey] = jsonData;
+          }
+        }
+
+        setData(newData);
+        alert("✓ Template uploaded successfully! Data has been updated.");
+      };
+
+      reader.readAsBinaryString(file);
+    } catch (error) {
+      console.error("Error uploading template:", error);
+      alert("Error uploading template. Please check the file format.");
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
   };
 
   const tabs = [
@@ -410,14 +543,21 @@ export default function App() {
               </button>
 
               <button
-                onClick={() =>
-                  alert("Upload feature requires the 'xlsx' library.")
-                }
+                onClick={handleUploadClick}
                 className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 cursor-pointer font-bold text-xs transition-colors border border-blue-200 shadow-sm"
               >
                 <Upload className="w-4 h-4" />
                 <span className="hidden sm:inline">Upload Excel</span>
               </button>
+              
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
             </div>
 
             <div className="flex space-x-1 bg-slate-100/80 p-1.5 rounded-full shadow-inner overflow-x-auto border border-slate-200/50 max-w-full">
