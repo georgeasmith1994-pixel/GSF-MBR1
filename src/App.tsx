@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   AreaChart,
   Area,
@@ -150,12 +150,6 @@ const defaultData = {
       total: 267569,
     },
   ],
-  aprilSpendBreakdown: [
-    { name: "PPM", value: 145441, color: "#0ea5e9" },
-    { name: "Quoted", value: 67073, color: "#8b5cf6" },
-    { name: "Reactive", value: 42256, color: "#f97316" },
-    { name: "Materials", value: 9798, color: "#ec4899" },
-  ],
   intruder2026: [
     {
       month: "Jan-26",
@@ -196,6 +190,18 @@ const defaultData = {
   ppmBreakdown: [
     { name: "UKN Engineers", due: 649, completed: 647, percent: 99.69 },
     { name: "Subcontractors", due: 23, completed: 20, percent: 86.96 },
+  ],
+  missedTasksLog: [
+    { team: "UKN Engineers", task: "Henfield: 1 Monthly Flushing overlooked." },
+    {
+      team: "UKN Engineers",
+      task: "Northallerton: 6 Monthly Roller Shutter service.",
+    },
+    {
+      team: "Subcontractors",
+      task: "Belfast: 1 Monthly Fire Alarm (Site declined access).",
+    },
+    { team: "Subcontractors", task: "Newtownards: 1 Monthly Fire Alarm." },
   ],
   topReactiveBranches2026: [
     { site: "GSF Burgess Hill 603 (CLOSED)", spend: 9768.95, jobs: 9 },
@@ -370,7 +376,27 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("executive");
 
   // Initialize data as state for dynamic updates
-  const [data, setData] = useState(() => defaultData);
+  const [data, setData] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedData = window.localStorage.getItem("gsfDashboardData");
+      if (savedData) {
+        try {
+          const parsedData = JSON.parse(savedData);
+          return { ...defaultData, ...parsedData };
+        } catch (e) {
+          console.error("Error parsing saved data:", e);
+          return defaultData;
+        }
+      }
+    }
+    return defaultData;
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("gsfDashboardData", JSON.stringify(data));
+    }
+  }, [data]);
 
   // Auth & Edit State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -380,68 +406,65 @@ export default function App() {
   const [selectedTable, setSelectedTable] =
     useState<keyof typeof defaultData>("spendData");
   const [formData, setFormData] = useState<any>({});
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
+  // Destructure state values cleanly
   const {
     spendData,
-    aprilSpendBreakdown,
     intruder2026,
     slaPerformance,
     ppmBreakdown,
+    missedTasksLog,
     topReactiveBranches2026,
     topIntruderBranches,
     cxFeedbackLog,
   } = data;
 
+  // Group missed tasks by team
+  const groupedMissedTasks = (missedTasksLog || []).reduce((acc, task) => {
+    if (!acc[task.team]) {
+      acc[task.team] = [];
+    }
+    acc[task.team].push(task);
+    return acc;
+  }, {} as Record<string, typeof missedTasksLog>);
+
+  // Derived state for latest month's breakdown
+  const latestSpendData =
+    spendData && spendData.length > 0 ? spendData[spendData.length - 1] : null;
+  const latestSpendBreakdown = latestSpendData
+    ? [
+        { name: "PPM", value: latestSpendData.ppm, color: "#0ea5e9" },
+        { name: "Quoted", value: latestSpendData.quoted, color: "#8b5cf6" },
+        { name: "Reactive", value: latestSpendData.reactive, color: "#f97316" },
+        {
+          name: "Materials",
+          value: latestSpendData.materials,
+          color: "#ec4899",
+        },
+      ]
+    : [];
+
   const downloadTemplate = () => {
     if (!XLSX) {
-      alert("xlsx library not loaded. Please install it: npm install xlsx");
+      alert(
+        "Excel export library is still loading. Please try again in a moment."
+      );
       return;
     }
-
     try {
       const workbook = XLSX.utils.book_new();
 
       // Add each data sheet
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(spendData),
-        "Spend Data"
-      );
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(aprilSpendBreakdown),
-        "April Breakdown"
-      );
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(intruder2026),
-        "Intruder 2026"
-      );
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(slaPerformance),
-        "SLA Performance"
-      );
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(ppmBreakdown),
-        "PPM Breakdown"
-      );
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(topReactiveBranches2026),
-        "Top Reactive"
-      );
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(topIntruderBranches),
-        "Top Intruder"
-      );
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(cxFeedbackLog),
-        "CX Feedback"
-      );
+      Object.keys(defaultData).forEach((key) => {
+        XLSX.utils.book_append_sheet(
+          workbook,
+          XLSX.utils.json_to_sheet((data as any)[key]),
+          key
+            .replace(/([A-Z])/g, " $1")
+            .replace(/^./, (str) => str.toUpperCase()) // Prettify sheet name
+        );
+      });
 
       // Generate filename with timestamp
       const now = new Date();
@@ -466,7 +489,37 @@ export default function App() {
     }
   };
 
-  const handleAddData = () => {
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+    setFormData({});
+  };
+
+  const handleEditClick = (index: number) => {
+    setEditingIndex(index);
+    setFormData(data[selectedTable][index]);
+  };
+
+  const handleDeleteClick = (index: number) => {
+    if (
+      window.confirm(
+        `Are you sure you want to delete this entry?\n\n${Object.values(
+          data[selectedTable][index]
+        ).join(" | ")}`
+      )
+    ) {
+      setData((prev) => ({
+        ...prev,
+        [selectedTable]: (prev[selectedTable] || []).filter(
+          (_, i) => i !== index
+        ),
+      }));
+      if (editingIndex === index) {
+        handleCancelEdit();
+      }
+    }
+  };
+
+  const handleSaveData = () => {
     const parsedData = { ...formData };
     Object.keys(parsedData).forEach((key) => {
       const value = parsedData[key];
@@ -479,13 +532,29 @@ export default function App() {
       }
     });
 
-    setData((prev) => ({
-      ...prev,
-      [selectedTable]: [...(prev[selectedTable] || []), parsedData],
-    }));
+    if (selectedTable === "spendData") {
+      const { reactive = 0, ppm = 0, quoted = 0, materials = 0 } = parsedData;
+      parsedData.total =
+        Number(reactive) + Number(ppm) + Number(quoted) + Number(materials);
+    }
+
+    if (editingIndex !== null) {
+      // Update
+      const tableData = [...(data[selectedTable] || [])];
+      tableData[editingIndex] = parsedData;
+      setData((prev) => ({ ...prev, [selectedTable]: tableData }));
+      alert("Data updated successfully!");
+    } else {
+      // Add
+      setData((prev) => ({
+        ...prev,
+        [selectedTable]: [...(prev[selectedTable] || []), parsedData],
+      }));
+      alert("Data added successfully!");
+    }
+
     setShowAddModal(false);
-    setFormData({});
-    alert("Data added successfully!");
+    handleCancelEdit();
   };
 
   const tabs = [
@@ -528,6 +597,23 @@ export default function App() {
           <div className="flex flex-col xl:flex-row items-center space-y-4 xl:space-y-0 xl:space-x-4">
             {/* ACTIONS */}
             <div className="flex space-x-2">
+              <button
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Are you sure you want to reset all data to the default template? This cannot be undone."
+                    )
+                  ) {
+                    setData(defaultData);
+                    alert("Data has been reset to the default template.");
+                  }
+                }}
+                className="flex items-center space-x-2 px-4 py-2 bg-yellow-50 text-yellow-600 rounded-full hover:bg-yellow-100 cursor-pointer font-bold text-xs transition-colors border border-yellow-200 shadow-sm"
+              >
+                <AlertTriangle className="w-4 h-4" />
+                <span className="hidden sm:inline">Reset Data</span>
+              </button>
+
               <button
                 onClick={downloadTemplate}
                 className="flex items-center space-x-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-100 cursor-pointer font-bold text-xs transition-colors border border-emerald-200 shadow-sm"
@@ -724,11 +810,7 @@ export default function App() {
                         strokeWidth={4}
                         fill="url(#colorTotalActive)"
                         name="Total Spend"
-                        activeDot={{
-                          r: 8,
-                          strokeWidth: 3,
-                          stroke: "#fff",
-                        }}
+                        activeDot={{ r: 8, strokeWidth: 3, stroke: "#fff" }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -746,7 +828,7 @@ export default function App() {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={aprilSpendBreakdown}
+                        data={latestSpendBreakdown}
                         cx="50%"
                         cy="50%"
                         innerRadius={80}
@@ -756,7 +838,7 @@ export default function App() {
                         stroke="none"
                         cornerRadius={6}
                       >
-                        {aprilSpendBreakdown.map((entry, index) => (
+                        {latestSpendBreakdown.map((entry, index) => (
                           <Cell
                             key={index}
                             fill={entry.color || "#cbd5e1"}
@@ -1133,74 +1215,75 @@ export default function App() {
                 </div>
 
                 <div className="space-y-6">
-                  <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm">
-                    <div className="flex items-center space-x-2 mb-3">
-                      <div className="w-2 h-6 bg-blue-500 rounded-full"></div>
-                      <p className="text-sm font-black text-blue-700 uppercase tracking-wider">
-                        UKN Engineers (2 Missed)
-                      </p>
-                    </div>
-                    <ul className="text-sm space-y-3 text-slate-700 font-medium">
-                      <li className="flex items-start">
-                        <span className="text-blue-500 mr-2 mt-0.5">•</span>
-                        <span>
-                          <strong>Henfield:</strong> 1 Monthly Flushing
-                          overlooked.
-                        </span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="text-blue-500 mr-2 mt-0.5">•</span>
-                        <span>
-                          <strong>Northallerton:</strong> 6 Monthly Roller
-                          Shutter service.
-                        </span>
-                      </li>
-                    </ul>
-                  </div>
+                  {Object.entries(groupedMissedTasks).map(([team, tasks]) => {
+                    const isUkn = team.includes("UKN");
+                    const barColor = isUkn ? "bg-blue-500" : "bg-amber-500";
+                    const textColor = isUkn
+                      ? "text-blue-700"
+                      : "text-amber-700";
+                    const bulletColor = isUkn
+                      ? "text-blue-500"
+                      : "text-amber-500";
 
-                  <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm">
-                    <div className="flex items-center space-x-2 mb-3">
-                      <div className="w-2 h-6 bg-amber-500 rounded-full"></div>
-                      <p className="text-sm font-black text-amber-700 uppercase tracking-wider">
-                        Subcontractors (3 Missed)
-                      </p>
-                    </div>
-                    <ul className="text-sm space-y-3 text-slate-700 font-medium">
-                      <li className="flex items-start">
-                        <span className="text-amber-500 mr-2 mt-0.5">•</span>
-                        <span>
-                          <strong>Belfast:</strong> 1 Monthly Fire Alarm (Site
-                          declined access).
-                        </span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="text-amber-500 mr-2 mt-0.5">•</span>
-                        <span>
-                          <strong>Newtownards:</strong> 1 Monthly Fire Alarm.
-                        </span>
-                      </li>
-                    </ul>
-                  </div>
+                    return (
+                      <div
+                        key={team}
+                        className="p-6 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm"
+                      >
+                        <div className="flex items-center space-x-2 mb-3">
+                          <div
+                            className={`w-2 h-6 ${barColor} rounded-full`}
+                          ></div>
+                          <p
+                            className={`text-sm font-black ${textColor} uppercase tracking-wider`}
+                          >
+                            {team} ({tasks.length} Missed)
+                          </p>
+                        </div>
+                        <ul className="text-sm space-y-3 text-slate-700 font-medium">
+                          {tasks.map((task, taskIdx) => {
+                            const parts = task.task.split(":");
+                            const location = parts[0];
+                            const description = parts.slice(1).join(":").trim();
+                            return (
+                              <li key={taskIdx} className="flex items-start">
+                                <span className={`${bulletColor} mr-2 mt-0.5`}>
+                                  •
+                                </span>
+                                <span>
+                                  <strong>{location}:</strong> {description}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* TAB 4: OPERATIONS & SECURITY */}
+        {/* TAB 4: OPERATIONS & SLAs */}
         {activeTab === "operations" && (
           <div className="space-y-8 animate-[fadeIn_0.5s_ease-out]">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8 hover:shadow-2xl transition-shadow duration-300">
-                <h3 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">
-                  Intruder Callouts vs Spend
+              {/* Intruder Spend & Visits Composed Chart */}
+              <div className="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100">
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2">
+                  Intruder Callouts & Spend
                 </h3>
                 <p className="text-sm font-medium text-slate-500 mb-8">
-                  Monthly Trend
+                  YTD Financial & Visit Analysis
                 </p>
-                <div className="h-[380px]">
+                <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={intruder2026}>
+                    <ComposedChart
+                      data={intruder2026}
+                      margin={{ left: -20, right: 10 }}
+                    >
                       <CartesianGrid
                         strokeDasharray="4 4"
                         vertical={false}
@@ -1284,6 +1367,7 @@ export default function App() {
                 </div>
               </div>
 
+              {/* SLA Compliance */}
               <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8 hover:shadow-2xl transition-shadow duration-300">
                 <div className="flex justify-between items-center mb-8">
                   <div>
@@ -1343,6 +1427,7 @@ export default function App() {
               </div>
             </div>
 
+            {/* Top Intruder Branches */}
             <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-10 overflow-hidden relative">
               <div className="absolute top-0 right-0 w-64 h-64 bg-rose-50 rounded-full blur-3xl -mr-20 -mt-20 z-0"></div>
               <div className="relative z-10">
@@ -1479,11 +1564,11 @@ export default function App() {
       <style
         dangerouslySetInnerHTML={{
           __html: `
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(15px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-        `,
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(15px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `,
         }}
       />
 
@@ -1527,13 +1612,16 @@ export default function App() {
 
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-fade-in-up">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-fade-in-up">
             <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <h3 className="text-xl font-black text-slate-800 flex items-center">
-                <Plus className="w-5 h-5 mr-2 text-blue-500" /> Add New Data
+                <Plus className="w-5 h-5 mr-2 text-blue-500" /> Data Editor
               </h3>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  setShowAddModal(false);
+                  handleCancelEdit();
+                }}
                 className="text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
@@ -1548,7 +1636,7 @@ export default function App() {
                   value={selectedTable}
                   onChange={(e) => {
                     setSelectedTable(e.target.value as any);
-                    setFormData({});
+                    handleCancelEdit();
                   }}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 >
@@ -1560,46 +1648,105 @@ export default function App() {
                 </select>
               </div>
 
-              <div className="space-y-4">
+              <div className="my-4 space-y-2 max-h-[200px] overflow-y-auto pr-2">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Row Data
+                  Existing Entries
                 </label>
+                {(data[selectedTable] || []).map((item, index) => (
+                  <div
+                    key={index}
+                    className={`flex items-center justify-between p-3 rounded-lg border ${
+                      editingIndex === index
+                        ? "bg-blue-50 border-blue-200"
+                        : "bg-slate-50 border-slate-200"
+                    }`}
+                  >
+                    <p
+                      className="text-xs text-slate-600 font-mono truncate w-full pr-2"
+                      title={Object.values(item).join(" | ")}
+                    >
+                      {Object.values(item).join(" | ")}
+                    </p>
+                    <div className="flex space-x-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleEditClick(index)}
+                        className="font-bold text-xs text-blue-600 hover:underline"
+                      >
+                        EDIT
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(index)}
+                        className="font-bold text-xs text-rose-600 hover:underline"
+                      >
+                        DEL
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-4 border-t border-slate-200 pt-4 mt-4">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    {editingIndex !== null
+                      ? `Editing Entry #${editingIndex + 1}`
+                      : "Add New Entry"}
+                  </label>
+                  {editingIndex !== null && (
+                    <button
+                      onClick={handleCancelEdit}
+                      className="text-xs font-bold text-slate-500 hover:underline"
+                    >
+                      Cancel Edit & Add New
+                    </button>
+                  )}
+                </div>
                 {data[selectedTable] && data[selectedTable].length > 0 ? (
                   Object.keys(data[selectedTable][0]).map((key) => (
                     <div key={key}>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        {key}
+                      <label className="block text-sm font-medium text-slate-700 mb-1 capitalize">
+                        {key.replace(/([A-Z])/g, " $1")}
                       </label>
                       <input
-                        type="text"
+                        type={
+                          typeof data[selectedTable][0][key] === "number"
+                            ? "number"
+                            : "text"
+                        }
                         value={formData[key] || ""}
                         onChange={(e) =>
                           setFormData({ ...formData, [key]: e.target.value })
                         }
                         className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder={`Enter ${key}...`}
+                        disabled={
+                          key === "total" && selectedTable === "spendData"
+                        }
                       />
                     </div>
                   ))
                 ) : (
                   <p className="text-sm text-slate-500 italic">
-                    No existing data to derive format from.
+                    This dataset is empty. Add the first entry.
                   </p>
                 )}
               </div>
             </div>
             <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end space-x-3">
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  setShowAddModal(false);
+                  handleCancelEdit();
+                }}
                 className="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={handleAddData}
+                onClick={handleSaveData}
                 className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors shadow-md"
               >
-                Save Data
+                {editingIndex !== null ? "Save Changes" : "Save New Data"}
               </button>
             </div>
           </div>
