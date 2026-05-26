@@ -257,37 +257,52 @@ const formatMoney = (val: number) =>
   }).format(val);
 
 // --- CUSTOM INTERACTIVE TOOLTIP ---
-const CustomTooltip = ({ active = false, payload = [], label = "" }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) => {
+const CustomTooltip = ({
+  active = false,
+  payload = [],
+  label = "",
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string }>;
+  label?: string;
+}) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white/95 backdrop-blur-sm p-4 rounded-xl shadow-2xl border border-slate-100 transform transition-all z-50">
         <p className="font-bold text-slate-800 mb-2 border-b border-slate-100 pb-1">
           {label}
         </p>
-        {payload.map((entry: { name: string; value: number; color: string }, index: number) => {
-          const isNum =
-            entry.name.includes("percent") ||
-            entry.name.includes("Resets") ||
-            entry.name.includes("Visits") ||
-            entry.name.includes("Tasks") ||
-            entry.name.includes("Due") ||
-            entry.name.includes("Completed");
-          return (
-            <div
-              key={index}
-              className="flex items-center space-x-3 text-sm my-1"
-            >
+        {payload.map(
+          (
+            entry: { name: string; value: number; color: string },
+            index: number
+          ) => {
+            const isNum =
+              entry.name.includes("percent") ||
+              entry.name.includes("Resets") ||
+              entry.name.includes("Visits") ||
+              entry.name.includes("Tasks") ||
+              entry.name.includes("Due") ||
+              entry.name.includes("Completed");
+            return (
               <div
-                className="w-3 h-3 rounded-full shadow-inner"
-                style={{ backgroundColor: entry.color }}
-              ></div>
-              <span className="text-slate-600 font-medium">{entry.name}:</span>
-              <span className="font-bold text-slate-900">
-                {isNum ? entry.value : formatMoney(entry.value)}
-              </span>
-            </div>
-          );
-        })}
+                key={index}
+                className="flex items-center space-x-3 text-sm my-1"
+              >
+                <div
+                  className="w-3 h-3 rounded-full shadow-inner"
+                  style={{ backgroundColor: entry.color }}
+                ></div>
+                <span className="text-slate-600 font-medium">
+                  {entry.name}:
+                </span>
+                <span className="font-bold text-slate-900">
+                  {isNum ? entry.value : formatMoney(entry.value)}
+                </span>
+              </div>
+            );
+          }
+        )}
       </div>
     );
   }
@@ -492,7 +507,6 @@ export default function App() {
       fileInputRef.current.value = "";
     }
   };
-  };
 
   const tabs = [
     { id: "executive", label: "Executive Summary", icon: Activity },
@@ -549,7 +563,7 @@ export default function App() {
                 <Upload className="w-4 h-4" />
                 <span className="hidden sm:inline">Upload Excel</span>
               </button>
-              
+
               {/* Hidden file input */}
               <input
                 ref={fileInputRef}
@@ -761,7 +775,15 @@ export default function App() {
                           />
                         ))}
                       </Pie>
-                      <Tooltip content={<CustomTooltip active={undefined} payload={undefined} label={undefined} />} />
+                      <Tooltip
+                        content={
+                          <CustomTooltip
+                            active={undefined}
+                            payload={undefined}
+                            label={undefined}
+                          />
+                        }
+                      />
                       <Legend
                         verticalAlign="bottom"
                         iconType="circle"
@@ -906,7 +928,13 @@ export default function App() {
                       dx={-10}
                     />
                     <Tooltip
-                      content={<CustomTooltip active={undefined} payload={undefined} label={undefined} />}
+                      content={
+                        <CustomTooltip
+                          active={undefined}
+                          payload={undefined}
+                          label={undefined}
+                        />
+                      }
                       cursor={{ fill: "rgba(241, 245, 249, 0.5)" }}
                     />
                     <Area
@@ -1073,7 +1101,13 @@ export default function App() {
                         tick={{ fill: "#64748b", fontWeight: 600 }}
                       />
                       <Tooltip
-                        content={<CustomTooltip active={undefined} payload={undefined} label={undefined} />}
+                        content={
+                          <CustomTooltip
+                            active={undefined}
+                            payload={undefined}
+                            label={undefined}
+                          />
+                        }
                         cursor={{ fill: "#f8fafc" }}
                       />
                       <Legend
@@ -1211,7 +1245,13 @@ export default function App() {
                         dx={10}
                       />
                       <Tooltip
-                        content={<CustomTooltip active={undefined} payload={undefined} label={undefined} />}
+                        content={
+                          <CustomTooltip
+                            active={undefined}
+                            payload={undefined}
+                            label={undefined}
+                          />
+                        }
                         cursor={{ fill: "#f8fafc" }}
                       />
                       <Legend
