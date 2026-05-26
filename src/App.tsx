@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   AreaChart,
   Area,
@@ -18,7 +18,6 @@ import {
 } from "recharts";
 import {
   DollarSign,
-  Wrench,
   ShieldAlert,
   Users,
   MapPin,
@@ -30,6 +29,7 @@ import {
   Zap,
   ListChecks,
   Upload,
+  Download,
 } from "lucide-react";
 
 // --- DATA ---
@@ -241,7 +241,7 @@ const defaultData = {
 };
 
 // --- UTILS ---
-const formatMoney = (val) =>
+const formatMoney = (val: number) =>
   new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency: "GBP",
@@ -249,14 +249,14 @@ const formatMoney = (val) =>
   }).format(val);
 
 // --- CUSTOM INTERACTIVE TOOLTIP ---
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = ({ active = false, payload = [], label = "" }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white/95 backdrop-blur-sm p-4 rounded-xl shadow-2xl border border-slate-100 transform transition-all z-50">
         <p className="font-bold text-slate-800 mb-2 border-b border-slate-100 pb-1">
           {label}
         </p>
-        {payload.map((entry, index) => {
+        {payload.map((entry: { name: string; value: number; color: string }, index: number) => {
           const isNum =
             entry.name.includes("percent") ||
             entry.name.includes("Resets") ||
@@ -287,6 +287,17 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 // --- VIBRANT CARD COMPONENT ---
+interface CardProps {
+  title: string;
+  value: string | number;
+  subtext: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  gradientFrom: string;
+  gradientTo: string;
+  iconColor: string;
+  onClick?: () => void;
+}
+
 const Card = ({
   title,
   value,
@@ -295,8 +306,8 @@ const Card = ({
   gradientFrom,
   gradientTo,
   iconColor,
-  onClick,
-}) => {
+  onClick = undefined,
+}: CardProps) => {
   const containerClass =
     "bg-gradient-to-br rounded-3xl shadow-lg border border-white/40 p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl cursor-pointer relative overflow-hidden group " +
     gradientFrom +
@@ -332,7 +343,6 @@ const Card = ({
 // --- MAIN APP ---
 export default function App() {
   const [activeTab, setActiveTab] = useState("executive");
-  const [dashboardData, setDashboardData] = useState(defaultData);
 
   const {
     spendData,
@@ -343,29 +353,12 @@ export default function App() {
     topReactiveBranches2026,
     topIntruderBranches,
     cxFeedbackLog,
-  } = dashboardData;
+  } = defaultData;
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const uploadedData = JSON.parse(event.target.result);
-        if (uploadedData.spendData) {
-          setDashboardData(uploadedData);
-          alert("Dashboard data successfully updated!");
-        } else {
-          alert(
-            "The uploaded JSON doesn't match the required dashboard structure."
-          );
-        }
-      } catch (err) {
-        alert("Invalid file format. Please upload a valid JSON data file.");
-      }
-    };
-    reader.readAsText(file);
+  const downloadTemplate = () => {
+    alert(
+      "This would download the Excel template in a production environment."
+    );
   };
 
   const tabs = [
@@ -388,8 +381,9 @@ export default function App() {
                 alt="GSF Logo"
                 className="w-full h-full object-contain"
                 onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src =
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null;
+                  target.src =
                     "https://placehold.co/100x100/ef4444/ffffff?text=GSF";
                 }}
               />
@@ -404,29 +398,33 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
-            <div className="relative">
-              <input
-                type="file"
-                id="data-upload"
-                accept=".json"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <label
-                htmlFor="data-upload"
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 cursor-pointer font-bold text-sm transition-colors border border-blue-200 shadow-sm"
+          <div className="flex flex-col xl:flex-row items-center space-y-4 xl:space-y-0 xl:space-x-4">
+            {/* EXCEL ACTIONS */}
+            <div className="flex space-x-2">
+              <button
+                onClick={downloadTemplate}
+                className="flex items-center space-x-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-100 cursor-pointer font-bold text-xs transition-colors border border-emerald-200 shadow-sm"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Get Template</span>
+              </button>
+
+              <button
+                onClick={() =>
+                  alert("Upload feature requires the 'xlsx' library.")
+                }
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 cursor-pointer font-bold text-xs transition-colors border border-blue-200 shadow-sm"
               >
                 <Upload className="w-4 h-4" />
-                <span className="hidden sm:inline">Upload JSON Data</span>
-              </label>
+                <span className="hidden sm:inline">Upload Excel</span>
+              </button>
             </div>
 
-            <div className="flex space-x-1 bg-slate-100/80 p-1.5 rounded-full shadow-inner overflow-x-auto border border-slate-200/50">
+            <div className="flex space-x-1 bg-slate-100/80 p-1.5 rounded-full shadow-inner overflow-x-auto border border-slate-200/50 max-w-full">
               {tabs.map((tab) => {
                 const isActive = activeTab === tab.id;
                 const btnBase =
-                  "flex items-center space-x-2 px-5 py-2.5 text-sm font-bold rounded-full transition-all duration-300 whitespace-nowrap ";
+                  "flex items-center space-x-2 px-4 py-2.5 text-sm font-bold rounded-full transition-all duration-300 whitespace-nowrap ";
                 const activeClass =
                   btnBase +
                   "bg-white text-blue-600 shadow-md transform scale-100";
@@ -460,8 +458,8 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card
                 title="Total Spend (Apr)"
-                value={formatMoney(267569)}
-                subtext="▼ Down from £318k"
+                value={formatMoney(spendData[spendData.length - 1].total)}
+                subtext="▼ Down from Last Mo."
                 icon={DollarSign}
                 gradientFrom="from-blue-50"
                 gradientTo="to-cyan-100"
@@ -470,8 +468,8 @@ export default function App() {
               />
               <Card
                 title="PPM Completion"
-                value="99.26%"
-                subtext="Target: 96%"
+                value={ppmBreakdown[0]?.percent + "%"}
+                subtext="UKN Engineers"
                 icon={CheckCircle2}
                 gradientFrom="from-emerald-50"
                 gradientTo="to-teal-100"
@@ -480,8 +478,8 @@ export default function App() {
               />
               <Card
                 title="P1 Compliance"
-                value="100%"
-                subtext="72 / 72 On Time"
+                value={slaPerformance[0]?.percent + "%"}
+                subtext="Emergency SLA"
                 icon={Clock}
                 gradientFrom="from-indigo-50"
                 gradientTo="to-purple-100"
@@ -491,7 +489,7 @@ export default function App() {
               <Card
                 title="CX Score"
                 value="99%"
-                subtext="175 Surveys"
+                subtext="Latest Surveys"
                 icon={Users}
                 gradientFrom="from-amber-50"
                 gradientTo="to-orange-100"
@@ -587,7 +585,6 @@ export default function App() {
                           r: 8,
                           strokeWidth: 3,
                           stroke: "#fff",
-                          shadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                         }}
                       />
                     </AreaChart>
@@ -597,7 +594,7 @@ export default function App() {
 
               <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8 hover:shadow-2xl hover:shadow-slate-200/50 transition-shadow duration-300">
                 <h3 className="text-2xl font-black text-slate-800 mb-1 tracking-tight">
-                  April Breakdown
+                  Latest Breakdown
                 </h3>
                 <p className="text-sm font-medium text-slate-500 mb-6">
                   Spend allocation
@@ -619,12 +616,12 @@ export default function App() {
                         {aprilSpendBreakdown.map((entry, index) => (
                           <Cell
                             key={index}
-                            fill={entry.color}
+                            fill={entry.color || "#cbd5e1"}
                             className="hover:opacity-80 transition-opacity duration-200 cursor-pointer outline-none"
                           />
                         ))}
                       </Pie>
-                      <Tooltip content={<CustomTooltip />} />
+                      <Tooltip content={<CustomTooltip active={undefined} payload={undefined} label={undefined} />} />
                       <Legend
                         verticalAlign="bottom"
                         iconType="circle"
@@ -769,7 +766,7 @@ export default function App() {
                       dx={-10}
                     />
                     <Tooltip
-                      content={<CustomTooltip />}
+                      content={<CustomTooltip active={undefined} payload={undefined} label={undefined} />}
                       cursor={{ fill: "rgba(241, 245, 249, 0.5)" }}
                     />
                     <Area
@@ -817,7 +814,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* NEW: TOP REACTIVE SPEND BRANCHES */}
             <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-10 overflow-hidden relative">
               <div className="absolute top-0 right-0 w-64 h-64 bg-orange-50 rounded-full blur-3xl -mr-20 -mt-20 z-0"></div>
               <div className="relative z-10">
@@ -826,7 +822,7 @@ export default function App() {
                     <DollarSign className="w-6 h-6 text-orange-600" />
                   </div>
                   <h3 className="text-2xl font-black text-slate-800 tracking-tight">
-                    Top 5 Reactive Spend Branches (2026 YTD)
+                    Top 5 Reactive Spend Branches (YTD)
                   </h3>
                 </div>
 
@@ -869,11 +865,7 @@ export default function App() {
                 <p className="text-sm font-bold text-emerald-100 uppercase tracking-widest mb-2">
                   Overall Completion
                 </p>
-                <p className="text-5xl font-black mb-3">
-                  {ppmBreakdown[0].percent + ppmBreakdown[1].percent > 0
-                    ? "99.26%"
-                    : "0%"}
-                </p>
+                <p className="text-5xl font-black mb-3">99.26%</p>
                 <div className="bg-black/20 backdrop-blur-sm rounded-xl py-2 px-4 inline-block">
                   <p className="text-sm font-medium">
                     667 / 672 Tasks Completed
@@ -882,29 +874,27 @@ export default function App() {
               </div>
               <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-3xl shadow-lg border border-blue-400 text-white transform hover:-translate-y-1 transition-all">
                 <p className="text-sm font-bold text-blue-100 uppercase tracking-widest mb-2">
-                  UKN Engineers
+                  {ppmBreakdown[0]?.name}
                 </p>
                 <p className="text-5xl font-black mb-3">
-                  {ppmBreakdown[0].percent}%
+                  {ppmBreakdown[0]?.percent}%
                 </p>
                 <div className="bg-black/20 backdrop-blur-sm rounded-xl py-2 px-4 inline-block">
                   <p className="text-sm font-medium">
-                    {ppmBreakdown[0].completed} / {ppmBreakdown[0].due} Tasks
-                    Completed
+                    {ppmBreakdown[0]?.completed} / {ppmBreakdown[0]?.due} Tasks
                   </p>
                 </div>
               </div>
               <div className="bg-gradient-to-br from-amber-500 to-orange-500 p-8 rounded-3xl shadow-lg border border-amber-400 text-white transform hover:-translate-y-1 transition-all">
                 <p className="text-sm font-bold text-amber-100 uppercase tracking-widest mb-2">
-                  Subcontractors
+                  {ppmBreakdown[1]?.name}
                 </p>
                 <p className="text-5xl font-black mb-3">
-                  {ppmBreakdown[1].percent}%
+                  {ppmBreakdown[1]?.percent}%
                 </p>
                 <div className="bg-black/20 backdrop-blur-sm rounded-xl py-2 px-4 inline-block">
                   <p className="text-sm font-medium">
-                    {ppmBreakdown[1].completed} / {ppmBreakdown[1].due} Tasks
-                    Completed
+                    {ppmBreakdown[1]?.completed} / {ppmBreakdown[1]?.due} Tasks
                   </p>
                 </div>
               </div>
@@ -916,7 +906,7 @@ export default function App() {
                   Task Completion vs. Due
                 </h3>
                 <p className="text-sm font-medium text-slate-500 mb-8">
-                  April 2026 performance
+                  Performance metrics
                 </p>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
@@ -943,7 +933,7 @@ export default function App() {
                         tick={{ fill: "#64748b", fontWeight: 600 }}
                       />
                       <Tooltip
-                        content={<CustomTooltip />}
+                        content={<CustomTooltip active={undefined} payload={undefined} label={undefined} />}
                         cursor={{ fill: "#f8fafc" }}
                       />
                       <Legend
@@ -992,14 +982,14 @@ export default function App() {
                         <span className="text-blue-500 mr-2 mt-0.5">•</span>
                         <span>
                           <strong>Henfield:</strong> 1 Monthly Flushing
-                          overlooked by engineer (Fed back internally).
+                          overlooked.
                         </span>
                       </li>
                       <li className="flex items-start">
                         <span className="text-blue-500 mr-2 mt-0.5">•</span>
                         <span>
                           <strong>Northallerton:</strong> 6 Monthly Roller
-                          Shutter service (Since completed on 07/05).
+                          Shutter service.
                         </span>
                       </li>
                     </ul>
@@ -1023,15 +1013,7 @@ export default function App() {
                       <li className="flex items-start">
                         <span className="text-amber-500 mr-2 mt-0.5">•</span>
                         <span>
-                          <strong>Newtownards:</strong> 1 Monthly Fire Alarm
-                          (Monitoring company unavailable).
-                        </span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="text-amber-500 mr-2 mt-0.5">•</span>
-                        <span>
-                          <strong>Newtownards:</strong> 1 Monthly Flushing
-                          (Awaiting paperwork).
+                          <strong>Newtownards:</strong> 1 Monthly Fire Alarm.
                         </span>
                       </li>
                     </ul>
@@ -1051,7 +1033,7 @@ export default function App() {
                   Intruder Callouts vs Spend
                 </h3>
                 <p className="text-sm font-medium text-slate-500 mb-8">
-                  2026 Monthly Trend
+                  Monthly Trend
                 </p>
                 <div className="h-[380px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -1089,7 +1071,7 @@ export default function App() {
                         dx={10}
                       />
                       <Tooltip
-                        content={<CustomTooltip />}
+                        content={<CustomTooltip active={undefined} payload={undefined} label={undefined} />}
                         cursor={{ fill: "#f8fafc" }}
                       />
                       <Legend
@@ -1189,22 +1171,9 @@ export default function App() {
                     );
                   })}
                 </div>
-                <div className="mt-10 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5 text-sm text-amber-900 flex shadow-sm">
-                  <AlertTriangle className="w-6 h-6 mr-4 shrink-0 text-amber-500" />
-                  <div>
-                    <p className="font-bold mb-1">Logging Discrepancy Note</p>
-                    <p className="leading-relaxed">
-                      P2 (Urgent) shows 0% due to an agreed logging discrepancy
-                      where fob orders and CCTV takeovers were mistakenly logged
-                      as 4-hour emergency criteria. Retained as 0% for GSF
-                      training reflection.
-                    </p>
-                  </div>
-                </div>
               </div>
             </div>
 
-            {/* NEW: TOP INTRUDER BRANCHES */}
             <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-10 overflow-hidden relative">
               <div className="absolute top-0 right-0 w-64 h-64 bg-rose-50 rounded-full blur-3xl -mr-20 -mt-20 z-0"></div>
               <div className="relative z-10">
@@ -1217,8 +1186,7 @@ export default function App() {
                       Top 5 Intruder Spend Branches
                     </h3>
                     <p className="text-sm font-medium text-slate-500 mt-1">
-                      Last 3 Months (Total YTD Spend: £28,921.92 across 91
-                      branches)
+                      Last 3 Months Overview
                     </p>
                   </div>
                 </div>
@@ -1267,10 +1235,6 @@ export default function App() {
                 <h3 className="text-xl font-black text-slate-800 mt-2">
                   Professionalism
                 </h3>
-                <p className="text-sm text-slate-500 mt-3 font-medium leading-relaxed">
-                  175 respondents rated UKN engineers highly positively for
-                  their demeanor.
-                </p>
               </div>
 
               <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8 flex flex-col items-center text-center group hover:-translate-y-2 transition-all duration-300">
@@ -1282,10 +1246,6 @@ export default function App() {
                 <h3 className="text-xl font-black text-slate-800 mt-2">
                   Uniform & PPE
                 </h3>
-                <p className="text-sm text-slate-500 mt-3 font-medium leading-relaxed">
-                  Consistent high standards observed, reinforcing safety & brand
-                  presentation.
-                </p>
               </div>
 
               <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8 flex flex-col items-center text-center group hover:-translate-y-2 transition-all duration-300">
@@ -1297,28 +1257,20 @@ export default function App() {
                 <h3 className="text-xl font-black text-slate-800 mt-2">
                   Site Cleanliness
                 </h3>
-                <p className="text-sm text-slate-500 mt-3 font-medium leading-relaxed">
-                  Engineers consistently maintain tidy and organized work
-                  environments post-repair.
-                </p>
               </div>
             </div>
 
-            {/* NEW: SPECIFIC FEEDBACK TRACKER */}
             <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-10 relative overflow-hidden">
-              <div className="absolute right-0 top-0 w-96 h-96 bg-gradient-to-bl from-blue-50/80 to-transparent rounded-bl-full -z-10"></div>
-
               <div className="mb-8">
                 <h3 className="text-3xl font-black text-slate-800 tracking-tight mb-2">
-                  Branch Feedback & Resolutions
+                  Branch Feedback
                 </h3>
                 <p className="text-slate-500 font-medium">
-                  Out of 175 completed surveys, there were 24 negative comments.
-                  Below are the specific issues addressed by UKN.
+                  Key survey insights and resolutions.
                 </p>
               </div>
 
-              <div className="space-y-4 relative z-10">
+              <div className="space-y-4">
                 {cxFeedbackLog.map((log, idx) => (
                   <div
                     key={idx}
@@ -1339,7 +1291,7 @@ export default function App() {
                       </div>
                       <div>
                         <p className="text-xs font-black text-blue-600 uppercase tracking-wider mb-2">
-                          UKN Finding & Resolution
+                          Resolution
                         </p>
                         <p className="text-slate-700 font-medium text-sm leading-relaxed">
                           {log.resolution}
@@ -1348,51 +1300,6 @@ export default function App() {
                     </div>
                   </div>
                 ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-10 relative overflow-hidden">
-              <div className="absolute right-0 top-0 w-96 h-96 bg-gradient-to-bl from-rose-100/50 to-transparent rounded-bl-full -z-10"></div>
-
-              <div className="mb-10">
-                <h3 className="text-3xl font-black text-slate-800 tracking-tight">
-                  Strategic Areas for Improvement
-                </h3>
-                <p className="text-slate-500 font-medium mt-2">
-                  Key focus points identified from qualitative survey feedback.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
-                <div className="bg-white/80 backdrop-blur-md p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-lg transition-shadow duration-300">
-                  <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-orange-100 rounded-2xl flex items-center justify-center mb-6 text-amber-600 shadow-inner transform -rotate-3">
-                    <AlertTriangle className="w-8 h-8" />
-                  </div>
-                  <h4 className="text-xl font-black text-slate-800 mb-3">
-                    Communication Clarity
-                  </h4>
-                  <p className="text-slate-600 font-medium leading-relaxed text-base">
-                    A significant portion of clients do not fully understand
-                    repairs due to unclear explanations by engineers. Better
-                    communication around the scheduling of work would
-                    drastically improve customer experience.
-                  </p>
-                </div>
-
-                <div className="bg-white/80 backdrop-blur-md p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-lg transition-shadow duration-300">
-                  <div className="w-16 h-16 bg-gradient-to-br from-rose-100 to-pink-100 rounded-2xl flex items-center justify-center mb-6 text-rose-600 shadow-inner transform rotate-3">
-                    <ShieldAlert className="w-8 h-8" />
-                  </div>
-                  <h4 className="text-xl font-black text-slate-800 mb-3">
-                    Procedural Transparency
-                  </h4>
-                  <p className="text-slate-600 font-medium leading-relaxed text-base">
-                    Many clients noted they were not informed about Risk
-                    Assessment and Method Statements (RAMS) before work began.
-                    This causes foundational trust issues that must be addressed
-                    via procedural briefings.
-                  </p>
-                </div>
               </div>
             </div>
           </div>
