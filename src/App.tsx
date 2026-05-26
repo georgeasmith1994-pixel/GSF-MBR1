@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-import * as XLSX from "xlsx";
+import React, { useState, useRef } from "react";
 import {
   AreaChart,
   Area,
@@ -33,32 +32,16 @@ import {
   Download,
 } from "lucide-react";
 
-// --- TYPES ---
-interface DataState {
-  spendData: any[];
-  aprilSpendBreakdown: any[];
-  intruder2026: any[];
-  slaPerformance: any[];
-  ppmBreakdown: any[];
-  topReactiveBranches2026: any[];
-  topIntruderBranches: any[];
-  cxFeedbackLog: any[];
-  missedTasksLog: any[];
-}
-
-interface CardProps {
-  title: string;
-  value: string | number;
-  subtext: string;
-  icon: React.ElementType;
-  gradientFrom: string;
-  gradientTo: string;
-  iconColor: string;
-  onClick?: () => void;
+// Dynamically import xlsx for Excel handling
+let XLSX: any = null;
+if (typeof window !== "undefined") {
+  import("xlsx").then((mod) => {
+    XLSX = mod;
+  });
 }
 
 // --- DATA ---
-const defaultData: DataState = {
+const defaultData = {
   spendData: [
     {
       month: "Apr-25",
@@ -263,42 +246,10 @@ const defaultData: DataState = {
         "Most jobs resolved same day by phone or attended promptly (e.g. logged 13/10 8am, attended 14/10 12pm). 1 awaiting UKSI paperwork.",
     },
   ],
-  missedTasksLog: [
-    {
-      category: "UKN Engineers",
-      site: "Henfield",
-      task: "1 Monthly Flushing",
-      reason: "Overlooked by engineer (Fed back internally).",
-    },
-    {
-      category: "UKN Engineers",
-      site: "Northallerton",
-      task: "6 Monthly Roller Shutter service",
-      reason: "Since completed on 07/05.",
-    },
-    {
-      category: "Subcontractors",
-      site: "Belfast",
-      task: "1 Monthly Fire Alarm",
-      reason: "Site declined access.",
-    },
-    {
-      category: "Subcontractors",
-      site: "Newtownards",
-      task: "1 Monthly Fire Alarm",
-      reason: "Monitoring company unavailable.",
-    },
-    {
-      category: "Subcontractors",
-      site: "Newtownards",
-      task: "1 Monthly Flushing",
-      reason: "Awaiting paperwork.",
-    },
-  ],
 };
 
 // --- UTILS ---
-const formatMoney = (val: number | any): string =>
+const formatMoney = (val: number) =>
   new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency: "GBP",
@@ -306,37 +257,52 @@ const formatMoney = (val: number | any): string =>
   }).format(val);
 
 // --- CUSTOM INTERACTIVE TOOLTIP ---
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({
+  active = false,
+  payload = [],
+  label = "",
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string }>;
+  label?: string;
+}) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white/95 backdrop-blur-sm p-4 rounded-xl shadow-2xl border border-slate-100 transform transition-all z-50">
         <p className="font-bold text-slate-800 mb-2 border-b border-slate-100 pb-1">
           {label}
         </p>
-        {payload.map((entry: any, index: number) => {
-          const isNum =
-            entry.name.includes("percent") ||
-            entry.name.includes("Resets") ||
-            entry.name.includes("Visits") ||
-            entry.name.includes("Tasks") ||
-            entry.name.includes("Due") ||
-            entry.name.includes("Completed");
-          return (
-            <div
-              key={index}
-              className="flex items-center space-x-3 text-sm my-1"
-            >
+        {payload.map(
+          (
+            entry: { name: string; value: number; color: string },
+            index: number
+          ) => {
+            const isNum =
+              entry.name.includes("percent") ||
+              entry.name.includes("Resets") ||
+              entry.name.includes("Visits") ||
+              entry.name.includes("Tasks") ||
+              entry.name.includes("Due") ||
+              entry.name.includes("Completed");
+            return (
               <div
-                className="w-3 h-3 rounded-full shadow-inner"
-                style={{ backgroundColor: entry.color || "#cbd5e1" }}
-              ></div>
-              <span className="text-slate-600 font-medium">{entry.name}:</span>
-              <span className="font-bold text-slate-900">
-                {isNum ? entry.value : formatMoney(entry.value)}
-              </span>
-            </div>
-          );
-        })}
+                key={index}
+                className="flex items-center space-x-3 text-sm my-1"
+              >
+                <div
+                  className="w-3 h-3 rounded-full shadow-inner"
+                  style={{ backgroundColor: entry.color }}
+                ></div>
+                <span className="text-slate-600 font-medium">
+                  {entry.name}:
+                </span>
+                <span className="font-bold text-slate-900">
+                  {isNum ? entry.value : formatMoney(entry.value)}
+                </span>
+              </div>
+            );
+          }
+        )}
       </div>
     );
   }
@@ -344,7 +310,18 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 // --- VIBRANT CARD COMPONENT ---
-const Card: React.FC<CardProps> = ({
+interface CardProps {
+  title: string;
+  value: string | number;
+  subtext: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  gradientFrom: string;
+  gradientTo: string;
+  iconColor: string;
+  onClick?: () => void;
+}
+
+const Card = ({
   title,
   value,
   subtext,
@@ -352,10 +329,16 @@ const Card: React.FC<CardProps> = ({
   gradientFrom,
   gradientTo,
   iconColor,
-  onClick,
-}) => {
-  const containerClass = `bg-gradient-to-br rounded-3xl shadow-lg border border-white/40 p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl cursor-pointer relative overflow-hidden group ${gradientFrom} ${gradientTo}`;
-  const iconClass = `w-8 h-8 transition-transform duration-300 group-hover:scale-110 ${iconColor}`;
+  onClick = undefined,
+}: CardProps) => {
+  const containerClass =
+    "bg-gradient-to-br rounded-3xl shadow-lg border border-white/40 p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl cursor-pointer relative overflow-hidden group " +
+    gradientFrom +
+    " " +
+    gradientTo;
+  const iconClass =
+    "w-8 h-8 transition-transform duration-300 group-hover:scale-110 " +
+    iconColor;
 
   return (
     <div className={containerClass} onClick={onClick}>
@@ -383,7 +366,10 @@ const Card: React.FC<CardProps> = ({
 // --- MAIN APP ---
 export default function App() {
   const [activeTab, setActiveTab] = useState("executive");
-  const [dashboardData] = useState<DataState>(defaultData);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize data as state for dynamic updates
+  const [data, setData] = useState(() => defaultData);
 
   const {
     spendData,
@@ -394,18 +380,132 @@ export default function App() {
     topReactiveBranches2026,
     topIntruderBranches,
     cxFeedbackLog,
-    missedTasksLog,
-  } = dashboardData;
+  } = data;
 
   const downloadTemplate = () => {
-    const wb = XLSX.utils.book_new();
-    Object.keys(dashboardData).forEach((key) => {
-      const ws = XLSX.utils.json_to_sheet(
-        dashboardData[key as keyof typeof dashboardData]
+    if (!XLSX) {
+      alert("xlsx library not loaded. Please install it: npm install xlsx");
+      return;
+    }
+
+    try {
+      const workbook = XLSX.utils.book_new();
+
+      // Add each data sheet
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(spendData),
+        "Spend Data"
       );
-      XLSX.utils.book_append_sheet(wb, ws, key);
-    });
-    XLSX.writeFile(wb, "GSF_Dashboard_Data_Template.xlsx");
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(aprilSpendBreakdown),
+        "April Breakdown"
+      );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(intruder2026),
+        "Intruder 2026"
+      );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(slaPerformance),
+        "SLA Performance"
+      );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(ppmBreakdown),
+        "PPM Breakdown"
+      );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(topReactiveBranches2026),
+        "Top Reactive"
+      );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(topIntruderBranches),
+        "Top Intruder"
+      );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(cxFeedbackLog),
+        "CX Feedback"
+      );
+
+      // Generate filename with timestamp
+      const now = new Date();
+      const timestamp = now.toISOString().split("T")[0];
+      const filename = `GSF_BusinessReview_Template_${timestamp}.xlsx`;
+
+      // Write file
+      XLSX.writeFile(workbook, filename);
+    } catch (error) {
+      console.error("Error downloading template:", error);
+      alert("Error downloading template. Check console for details.");
+    }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!XLSX) {
+      alert("xlsx library not loaded. Please install it: npm install xlsx");
+      return;
+    }
+
+    try {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const fileData = e.target?.result;
+        const workbook = XLSX.read(fileData, { type: "binary" });
+
+        const sheetNames = workbook.SheetNames;
+        const newData: any = { ...data };
+
+        // Map sheet names to data keys
+        const sheetMap: { [key: string]: string } = {
+          "Spend Data": "spendData",
+          "April Breakdown": "aprilSpendBreakdown",
+          "Intruder 2026": "intruder2026",
+          "SLA Performance": "slaPerformance",
+          "PPM Breakdown": "ppmBreakdown",
+          "Top Reactive": "topReactiveBranches2026",
+          "Top Intruder": "topIntruderBranches",
+          "CX Feedback": "cxFeedbackLog",
+        };
+
+        for (const sheetName of sheetNames) {
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+          const dataKey = sheetMap[sheetName];
+          if (dataKey && jsonData.length > 0) {
+            newData[dataKey] = jsonData;
+          }
+        }
+
+        setData(newData);
+        alert("✓ Template uploaded successfully! Data has been updated.");
+      };
+
+      reader.readAsBinaryString(file);
+    } catch (error) {
+      console.error("Error uploading template:", error);
+      alert("Error uploading template. Please check the file format.");
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const tabs = [
@@ -420,16 +520,17 @@ export default function App() {
     <div className="min-h-screen bg-[#f1f5f9] font-sans text-slate-900 pb-12">
       {/* VIBRANT HEADER */}
       <header className="bg-white/80 backdrop-blur-lg border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center space-x-4">
             <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center shadow-md border border-slate-100 transform transition hover:scale-105 cursor-pointer overflow-hidden p-1.5">
               <img
                 src="images.png"
                 alt="GSF Logo"
                 className="w-full h-full object-contain"
-                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src =
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null;
+                  target.src =
                     "https://placehold.co/100x100/ef4444/ffffff?text=GSF";
                 }}
               />
@@ -444,7 +545,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex flex-col lg:flex-row items-center space-y-4 lg:space-y-0 lg:space-x-4">
+          <div className="flex flex-col xl:flex-row items-center space-y-4 xl:space-y-0 xl:space-x-4">
             {/* EXCEL ACTIONS */}
             <div className="flex space-x-2">
               <button
@@ -456,16 +557,21 @@ export default function App() {
               </button>
 
               <button
-                onClick={() =>
-                  alert(
-                    "Upload feature requires the UI logic connected to xlsx parsing."
-                  )
-                }
+                onClick={handleUploadClick}
                 className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 cursor-pointer font-bold text-xs transition-colors border border-blue-200 shadow-sm"
               >
                 <Upload className="w-4 h-4" />
                 <span className="hidden sm:inline">Upload Excel</span>
               </button>
+
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
             </div>
 
             <div className="flex space-x-1 bg-slate-100/80 p-1.5 rounded-full shadow-inner overflow-x-auto border border-slate-200/50 max-w-full">
@@ -487,7 +593,7 @@ export default function App() {
                     className={isActive ? activeClass : inactiveClass}
                   >
                     <tab.icon
-                      className={`w-4 h-4 ${isActive ? "animate-pulse" : ""}`}
+                      className={"w-4 h-4 " + (isActive ? "animate-pulse" : "")}
                     />
                     <span>{tab.label}</span>
                   </button>
@@ -505,7 +611,7 @@ export default function App() {
           <div className="space-y-8 animate-[fadeIn_0.5s_ease-out]">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card
-                title="Total Spend (Previous Month)"
+                title="Total Spend (Apr)"
                 value={formatMoney(spendData[spendData.length - 1].total)}
                 subtext="▼ Down from Last Mo."
                 icon={DollarSign}
@@ -615,9 +721,7 @@ export default function App() {
                         dx={-10}
                       />
                       <Tooltip
-                        content={
-                          <CustomTooltip active={true} payload={[]} label="" />
-                        }
+                        content={<CustomTooltip />}
                         cursor={{
                           stroke: "#94a3b8",
                           strokeWidth: 2,
@@ -631,7 +735,11 @@ export default function App() {
                         strokeWidth={4}
                         fill="url(#colorTotalActive)"
                         name="Total Spend"
-                        activeDot={{ r: 8, strokeWidth: 3, stroke: "#fff" }}
+                        activeDot={{
+                          r: 8,
+                          strokeWidth: 3,
+                          stroke: "#fff",
+                        }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -669,7 +777,11 @@ export default function App() {
                       </Pie>
                       <Tooltip
                         content={
-                          <CustomTooltip active={true} payload={[]} label="" />
+                          <CustomTooltip
+                            active={undefined}
+                            payload={undefined}
+                            label={undefined}
+                          />
                         }
                       />
                       <Legend
@@ -817,7 +929,11 @@ export default function App() {
                     />
                     <Tooltip
                       content={
-                        <CustomTooltip active={true} payload={[]} label="" />
+                        <CustomTooltip
+                          active={undefined}
+                          payload={undefined}
+                          label={undefined}
+                        />
                       }
                       cursor={{ fill: "rgba(241, 245, 249, 0.5)" }}
                     />
@@ -917,13 +1033,7 @@ export default function App() {
                 <p className="text-sm font-bold text-emerald-100 uppercase tracking-widest mb-2">
                   Overall Completion
                 </p>
-                <p className="text-5xl font-black mb-3">
-                  {(ppmBreakdown[0]?.percent || 0) +
-                    (ppmBreakdown[1]?.percent || 0) >
-                  0
-                    ? "99.26%"
-                    : "0%"}
-                </p>
+                <p className="text-5xl font-black mb-3">99.26%</p>
                 <div className="bg-black/20 backdrop-blur-sm rounded-xl py-2 px-4 inline-block">
                   <p className="text-sm font-medium">
                     667 / 672 Tasks Completed
@@ -932,29 +1042,27 @@ export default function App() {
               </div>
               <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-3xl shadow-lg border border-blue-400 text-white transform hover:-translate-y-1 transition-all">
                 <p className="text-sm font-bold text-blue-100 uppercase tracking-widest mb-2">
-                  {ppmBreakdown[0]?.name || "Team A"}
+                  {ppmBreakdown[0]?.name}
                 </p>
                 <p className="text-5xl font-black mb-3">
-                  {ppmBreakdown[0]?.percent || 0}%
+                  {ppmBreakdown[0]?.percent}%
                 </p>
                 <div className="bg-black/20 backdrop-blur-sm rounded-xl py-2 px-4 inline-block">
                   <p className="text-sm font-medium">
-                    {ppmBreakdown[0]?.completed || 0} /{" "}
-                    {ppmBreakdown[0]?.due || 0} Tasks
+                    {ppmBreakdown[0]?.completed} / {ppmBreakdown[0]?.due} Tasks
                   </p>
                 </div>
               </div>
               <div className="bg-gradient-to-br from-amber-500 to-orange-500 p-8 rounded-3xl shadow-lg border border-amber-400 text-white transform hover:-translate-y-1 transition-all">
                 <p className="text-sm font-bold text-amber-100 uppercase tracking-widest mb-2">
-                  {ppmBreakdown[1]?.name || "Team B"}
+                  {ppmBreakdown[1]?.name}
                 </p>
                 <p className="text-5xl font-black mb-3">
-                  {ppmBreakdown[1]?.percent || 0}%
+                  {ppmBreakdown[1]?.percent}%
                 </p>
                 <div className="bg-black/20 backdrop-blur-sm rounded-xl py-2 px-4 inline-block">
                   <p className="text-sm font-medium">
-                    {ppmBreakdown[1]?.completed || 0} /{" "}
-                    {ppmBreakdown[1]?.due || 0} Tasks
+                    {ppmBreakdown[1]?.completed} / {ppmBreakdown[1]?.due} Tasks
                   </p>
                 </div>
               </div>
@@ -994,7 +1102,11 @@ export default function App() {
                       />
                       <Tooltip
                         content={
-                          <CustomTooltip active={true} payload={[]} label="" />
+                          <CustomTooltip
+                            active={undefined}
+                            payload={undefined}
+                            label={undefined}
+                          />
                         }
                         cursor={{ fill: "#f8fafc" }}
                       />
@@ -1032,52 +1144,54 @@ export default function App() {
                 </div>
 
                 <div className="space-y-6">
-                  {["UKN Engineers", "Subcontractors"].map((category) => (
-                    <div
-                      key={category}
-                      className="p-6 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm"
-                    >
-                      <div className="flex items-center space-x-2 mb-3">
-                        <div
-                          className={`w-2 h-6 rounded-full ${
-                            category === "UKN Engineers"
-                              ? "bg-blue-500"
-                              : "bg-amber-500"
-                          }`}
-                        ></div>
-                        <p
-                          className={`text-sm font-black uppercase tracking-wider ${
-                            category === "UKN Engineers"
-                              ? "text-blue-700"
-                              : "text-amber-700"
-                          }`}
-                        >
-                          {category}
-                        </p>
-                      </div>
-                      <ul className="text-sm space-y-3 text-slate-700 font-medium">
-                        {missedTasksLog
-                          .filter((task: any) => task.category === category)
-                          .map((item: any, idx: number) => (
-                            <li key={idx} className="flex items-start">
-                              <span
-                                className={`${
-                                  category === "UKN Engineers"
-                                    ? "text-blue-500"
-                                    : "text-amber-500"
-                                } mr-2 mt-0.5`}
-                              >
-                                •
-                              </span>
-                              <span>
-                                <strong>{item.site}:</strong> {item.task} (
-                                {item.reason})
-                              </span>
-                            </li>
-                          ))}
-                      </ul>
+                  <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <div className="w-2 h-6 bg-blue-500 rounded-full"></div>
+                      <p className="text-sm font-black text-blue-700 uppercase tracking-wider">
+                        UKN Engineers (2 Missed)
+                      </p>
                     </div>
-                  ))}
+                    <ul className="text-sm space-y-3 text-slate-700 font-medium">
+                      <li className="flex items-start">
+                        <span className="text-blue-500 mr-2 mt-0.5">•</span>
+                        <span>
+                          <strong>Henfield:</strong> 1 Monthly Flushing
+                          overlooked.
+                        </span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="text-blue-500 mr-2 mt-0.5">•</span>
+                        <span>
+                          <strong>Northallerton:</strong> 6 Monthly Roller
+                          Shutter service.
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <div className="w-2 h-6 bg-amber-500 rounded-full"></div>
+                      <p className="text-sm font-black text-amber-700 uppercase tracking-wider">
+                        Subcontractors (3 Missed)
+                      </p>
+                    </div>
+                    <ul className="text-sm space-y-3 text-slate-700 font-medium">
+                      <li className="flex items-start">
+                        <span className="text-amber-500 mr-2 mt-0.5">•</span>
+                        <span>
+                          <strong>Belfast:</strong> 1 Monthly Fire Alarm (Site
+                          declined access).
+                        </span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="text-amber-500 mr-2 mt-0.5">•</span>
+                        <span>
+                          <strong>Newtownards:</strong> 1 Monthly Fire Alarm.
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1132,7 +1246,11 @@ export default function App() {
                       />
                       <Tooltip
                         content={
-                          <CustomTooltip active={true} payload={[]} label="" />
+                          <CustomTooltip
+                            active={undefined}
+                            payload={undefined}
+                            label={undefined}
+                          />
                         }
                         cursor={{ fill: "#f8fafc" }}
                       />
@@ -1233,10 +1351,6 @@ export default function App() {
                     );
                   })}
                 </div>
-                <div className="mt-10 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5 text-sm text-amber-900 flex shadow-sm">
-                  <AlertTriangle className="w-6 h-6 mr-4 shrink-0 text-amber-500" />
-                  <div></div>
-                </div>
               </div>
             </div>
 
@@ -1252,7 +1366,7 @@ export default function App() {
                       Top 5 Intruder Spend Branches
                     </h3>
                     <p className="text-sm font-medium text-slate-500 mt-1">
-                      Last 3 Months Spend Overview
+                      Last 3 Months Overview
                     </p>
                   </div>
                 </div>
@@ -1301,10 +1415,6 @@ export default function App() {
                 <h3 className="text-xl font-black text-slate-800 mt-2">
                   Professionalism
                 </h3>
-                <p className="text-sm text-slate-500 mt-3 font-medium leading-relaxed">
-                  175 respondents rated UKN engineers highly positively for
-                  their demeanor.
-                </p>
               </div>
 
               <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8 flex flex-col items-center text-center group hover:-translate-y-2 transition-all duration-300">
@@ -1316,10 +1426,6 @@ export default function App() {
                 <h3 className="text-xl font-black text-slate-800 mt-2">
                   Uniform & PPE
                 </h3>
-                <p className="text-sm text-slate-500 mt-3 font-medium leading-relaxed">
-                  Consistent high standards observed, reinforcing safety & brand
-                  presentation.
-                </p>
               </div>
 
               <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8 flex flex-col items-center text-center group hover:-translate-y-2 transition-all duration-300">
@@ -1331,27 +1437,20 @@ export default function App() {
                 <h3 className="text-xl font-black text-slate-800 mt-2">
                   Site Cleanliness
                 </h3>
-                <p className="text-sm text-slate-500 mt-3 font-medium leading-relaxed">
-                  Engineers consistently maintain tidy and organized work
-                  environments post-repair.
-                </p>
               </div>
             </div>
 
             <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-10 relative overflow-hidden">
-              <div className="absolute right-0 top-0 w-96 h-96 bg-gradient-to-bl from-blue-50/80 to-transparent rounded-bl-full -z-10"></div>
-
               <div className="mb-8">
                 <h3 className="text-3xl font-black text-slate-800 tracking-tight mb-2">
-                  Branch Feedback & Resolutions
+                  Branch Feedback
                 </h3>
                 <p className="text-slate-500 font-medium">
-                  Out of 175 completed surveys, there were 24 negative comments.
-                  Below are the specific issues addressed by UKN.
+                  Key survey insights and resolutions.
                 </p>
               </div>
 
-              <div className="space-y-4 relative z-10">
+              <div className="space-y-4">
                 {cxFeedbackLog.map((log, idx) => (
                   <div
                     key={idx}
@@ -1372,7 +1471,7 @@ export default function App() {
                       </div>
                       <div>
                         <p className="text-xs font-black text-blue-600 uppercase tracking-wider mb-2">
-                          UKN Finding & Resolution
+                          Resolution
                         </p>
                         <p className="text-slate-700 font-medium text-sm leading-relaxed">
                           {log.resolution}
@@ -1381,51 +1480,6 @@ export default function App() {
                     </div>
                   </div>
                 ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-10 relative overflow-hidden">
-              <div className="absolute right-0 top-0 w-96 h-96 bg-gradient-to-bl from-rose-100/50 to-transparent rounded-bl-full -z-10"></div>
-
-              <div className="mb-10">
-                <h3 className="text-3xl font-black text-slate-800 tracking-tight">
-                  Strategic Areas for Improvement
-                </h3>
-                <p className="text-slate-500 font-medium mt-2">
-                  Key focus points identified from qualitative survey feedback.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
-                <div className="bg-white/80 backdrop-blur-md p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-lg transition-shadow duration-300">
-                  <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-orange-100 rounded-2xl flex items-center justify-center mb-6 text-amber-600 shadow-inner transform -rotate-3">
-                    <AlertTriangle className="w-8 h-8" />
-                  </div>
-                  <h4 className="text-xl font-black text-slate-800 mb-3">
-                    Communication Clarity
-                  </h4>
-                  <p className="text-slate-600 font-medium leading-relaxed text-base">
-                    A significant portion of clients do not fully understand
-                    repairs due to unclear explanations by engineers. Better
-                    communication around the scheduling of work would
-                    drastically improve customer experience.
-                  </p>
-                </div>
-
-                <div className="bg-white/80 backdrop-blur-md p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-lg transition-shadow duration-300">
-                  <div className="w-16 h-16 bg-gradient-to-br from-rose-100 to-pink-100 rounded-2xl flex items-center justify-center mb-6 text-rose-600 shadow-inner transform rotate-3">
-                    <ShieldAlert className="w-8 h-8" />
-                  </div>
-                  <h4 className="text-xl font-black text-slate-800 mb-3">
-                    Procedural Transparency
-                  </h4>
-                  <p className="text-slate-600 font-medium leading-relaxed text-base">
-                    Many clients noted they were not informed about Risk
-                    Assessment and Method Statements (RAMS) before work began.
-                    This causes foundational trust issues that must be addressed
-                    via procedural briefings.
-                  </p>
-                </div>
               </div>
             </div>
           </div>
