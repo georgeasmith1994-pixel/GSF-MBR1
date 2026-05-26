@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
   AreaChart,
   Area,
@@ -28,8 +28,10 @@ import {
   Activity,
   Zap,
   ListChecks,
-  Upload,
   Download,
+  Lock,
+  Plus,
+  X,
 } from "lucide-react";
 
 // Dynamically import xlsx for Excel handling
@@ -366,10 +368,18 @@ const Card = ({
 // --- MAIN APP ---
 export default function App() {
   const [activeTab, setActiveTab] = useState("executive");
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize data as state for dynamic updates
   const [data, setData] = useState(() => defaultData);
+
+  // Auth & Edit State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [password, setPassword] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedTable, setSelectedTable] =
+    useState<keyof typeof defaultData>("spendData");
+  const [formData, setFormData] = useState<any>({});
 
   const {
     spendData,
@@ -446,66 +456,36 @@ export default function App() {
     }
   };
 
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
+  const handleLogin = () => {
+    if (password === "admin123") {
+      setIsAuthenticated(true);
+      setShowAuthModal(false);
+      setPassword("");
+    } else {
+      alert("Incorrect password!");
+    }
   };
 
-  const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleAddData = () => {
+    const parsedData = { ...formData };
+    Object.keys(parsedData).forEach((key) => {
+      const value = parsedData[key];
+      if (
+        typeof value === "string" &&
+        value.trim() !== "" &&
+        !isNaN(Number(value))
+      ) {
+        parsedData[key] = Number(value);
+      }
+    });
 
-    if (!XLSX) {
-      alert("xlsx library not loaded. Please install it: npm install xlsx");
-      return;
-    }
-
-    try {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const fileData = e.target?.result;
-        const workbook = XLSX.read(fileData, { type: "binary" });
-
-        const sheetNames = workbook.SheetNames;
-        const newData: any = { ...data };
-
-        // Map sheet names to data keys
-        const sheetMap: { [key: string]: string } = {
-          "Spend Data": "spendData",
-          "April Breakdown": "aprilSpendBreakdown",
-          "Intruder 2026": "intruder2026",
-          "SLA Performance": "slaPerformance",
-          "PPM Breakdown": "ppmBreakdown",
-          "Top Reactive": "topReactiveBranches2026",
-          "Top Intruder": "topIntruderBranches",
-          "CX Feedback": "cxFeedbackLog",
-        };
-
-        for (const sheetName of sheetNames) {
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-          const dataKey = sheetMap[sheetName];
-          if (dataKey && jsonData.length > 0) {
-            newData[dataKey] = jsonData;
-          }
-        }
-
-        setData(newData);
-        alert("✓ Template uploaded successfully! Data has been updated.");
-      };
-
-      reader.readAsBinaryString(file);
-    } catch (error) {
-      console.error("Error uploading template:", error);
-      alert("Error uploading template. Please check the file format.");
-    }
-
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    setData((prev) => ({
+      ...prev,
+      [selectedTable]: [...(prev[selectedTable] || []), parsedData],
+    }));
+    setShowAddModal(false);
+    setFormData({});
+    alert("Data added successfully!");
   };
 
   const tabs = [
@@ -546,7 +526,7 @@ export default function App() {
           </div>
 
           <div className="flex flex-col xl:flex-row items-center space-y-4 xl:space-y-0 xl:space-x-4">
-            {/* EXCEL ACTIONS */}
+            {/* ACTIONS */}
             <div className="flex space-x-2">
               <button
                 onClick={downloadTemplate}
@@ -556,22 +536,31 @@ export default function App() {
                 <span className="hidden sm:inline">Get Template</span>
               </button>
 
-              <button
-                onClick={handleUploadClick}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 cursor-pointer font-bold text-xs transition-colors border border-blue-200 shadow-sm"
-              >
-                <Upload className="w-4 h-4" />
-                <span className="hidden sm:inline">Upload Excel</span>
-              </button>
-
-              {/* Hidden file input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
+              {!isAuthenticated ? (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 cursor-pointer font-bold text-xs transition-colors border border-slate-200 shadow-sm"
+                >
+                  <Lock className="w-4 h-4" />
+                  <span className="hidden sm:inline">Admin Login</span>
+                </button>
+              ) : (
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 cursor-pointer font-bold text-xs transition-colors border border-blue-200 shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">Add Data</span>
+                  </button>
+                  <button
+                    onClick={() => setIsAuthenticated(false)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-full hover:bg-rose-100 cursor-pointer font-bold text-xs transition-colors border border-rose-200 shadow-sm"
+                  >
+                    <span className="hidden sm:inline">Log Out</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex space-x-1 bg-slate-100/80 p-1.5 rounded-full shadow-inner overflow-x-auto border border-slate-200/50 max-w-full">
@@ -1490,13 +1479,132 @@ export default function App() {
       <style
         dangerouslySetInnerHTML={{
           __html: `
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(15px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `,
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `,
         }}
       />
+
+      {/* MODALS */}
+      {showAuthModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-up">
+            <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-xl font-black text-slate-800 flex items-center">
+                <Lock className="w-5 h-5 mr-2 text-slate-500" /> Admin Access
+              </h3>
+              <button
+                onClick={() => setShowAuthModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm font-medium text-slate-500 mb-4">
+                Enter password to enable data editing.
+              </p>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password (admin123)"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6"
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              />
+              <button
+                onClick={handleLogin}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors shadow-md"
+              >
+                Unlock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-fade-in-up">
+            <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-xl font-black text-slate-800 flex items-center">
+                <Plus className="w-5 h-5 mr-2 text-blue-500" /> Add New Data
+              </h3>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="mb-6">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  Select Dataset
+                </label>
+                <select
+                  value={selectedTable}
+                  onChange={(e) => {
+                    setSelectedTable(e.target.value as any);
+                    setFormData({});
+                  }}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  {Object.keys(data).map((key) => (
+                    <option key={key} value={key}>
+                      {key}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  Row Data
+                </label>
+                {data[selectedTable] && data[selectedTable].length > 0 ? (
+                  Object.keys(data[selectedTable][0]).map((key) => (
+                    <div key={key}>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        {key}
+                      </label>
+                      <input
+                        type="text"
+                        value={formData[key] || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, [key]: e.target.value })
+                        }
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder={`Enter ${key}...`}
+                      />
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-500 italic">
+                    No existing data to derive format from.
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddData}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors shadow-md"
+              >
+                Save Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
