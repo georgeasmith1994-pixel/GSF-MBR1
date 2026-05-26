@@ -32,6 +32,7 @@ import {
   Lock,
   Plus,
   X,
+  Save,
 } from "lucide-react";
 
 // Dynamically import xlsx for Excel handling
@@ -391,6 +392,19 @@ export default function App() {
     }
     return defaultData;
   });
+  const [checkpointData, setCheckpointData] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = window.localStorage.getItem("gsfDashboardCheckpoint");
+      if (saved) {
+        try {
+          return { ...defaultData, ...JSON.parse(saved) };
+        } catch (e) {
+          console.error("Error parsing checkpoint data:", e);
+        }
+      }
+    }
+    return defaultData;
+  });
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -557,6 +571,19 @@ export default function App() {
     handleCancelEdit();
   };
 
+  const handleSaveCheckpoint = () => {
+    if (window.confirm("Set current data as the new reset checkpoint?")) {
+      setCheckpointData(data);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          "gsfDashboardCheckpoint",
+          JSON.stringify(data)
+        );
+      }
+      alert("Checkpoint saved. Resetting will now restore to this point.");
+    }
+  };
+
   const tabs = [
     { id: "executive", label: "Executive Summary", icon: Activity },
     { id: "financials", label: "Financial Spend", icon: DollarSign },
@@ -597,31 +624,6 @@ export default function App() {
           <div className="flex flex-col xl:flex-row items-center space-y-4 xl:space-y-0 xl:space-x-4">
             {/* ACTIONS */}
             <div className="flex space-x-2">
-              <button
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "Are you sure you want to reset all data to the default template? This cannot be undone."
-                    )
-                  ) {
-                    setData(defaultData);
-                    alert("Data has been reset to the default template.");
-                  }
-                }}
-                className="flex items-center space-x-2 px-4 py-2 bg-yellow-50 text-yellow-600 rounded-full hover:bg-yellow-100 cursor-pointer font-bold text-xs transition-colors border border-yellow-200 shadow-sm"
-              >
-                <AlertTriangle className="w-4 h-4" />
-                <span className="hidden sm:inline">Reset Data</span>
-              </button>
-
-              <button
-                onClick={downloadTemplate}
-                className="flex items-center space-x-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-100 cursor-pointer font-bold text-xs transition-colors border border-emerald-200 shadow-sm"
-              >
-                <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">Get Template</span>
-              </button>
-
               {!isAuthenticated ? (
                 <button
                   onClick={() => setShowAuthModal(true)}
@@ -633,12 +635,46 @@ export default function App() {
               ) : (
                 <div className="flex space-x-2">
                   <button
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          "Are you sure you want to reset all data to the last checkpoint? This cannot be undone."
+                        )
+                      ) {
+                        setData(checkpointData);
+                        alert("Data has been reset to the last checkpoint.");
+                      }
+                    }}
+                    className="flex items-center space-x-2 px-4 py-2 bg-yellow-50 text-yellow-600 rounded-full hover:bg-yellow-100 cursor-pointer font-bold text-xs transition-colors border border-yellow-200 shadow-sm"
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="hidden sm:inline">Reset Data</span>
+                  </button>
+
+                  <button
+                    onClick={downloadTemplate}
+                    className="flex items-center space-x-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-100 cursor-pointer font-bold text-xs transition-colors border border-emerald-200 shadow-sm"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span className="hidden sm:inline">Get Template</span>
+                  </button>
+
+                  <button
+                    onClick={handleSaveCheckpoint}
+                    className="flex items-center space-x-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 cursor-pointer font-bold text-xs transition-colors border border-indigo-200 shadow-sm"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span className="hidden sm:inline">Set Checkpoint</span>
+                  </button>
+
+                  <button
                     onClick={() => setShowAddModal(true)}
                     className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 cursor-pointer font-bold text-xs transition-colors border border-blue-200 shadow-sm"
                   >
                     <Plus className="w-4 h-4" />
                     <span className="hidden sm:inline">Add Data</span>
                   </button>
+
                   <button
                     onClick={() => setIsAuthenticated(false)}
                     className="flex items-center space-x-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-full hover:bg-rose-100 cursor-pointer font-bold text-xs transition-colors border border-rose-200 shadow-sm"
@@ -1602,7 +1638,7 @@ export default function App() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password (admin123)"
+                placeholder="Password"
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6"
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
