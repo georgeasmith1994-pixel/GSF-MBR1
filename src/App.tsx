@@ -30,6 +30,7 @@ import {
   ListChecks,
   Upload,
   Download,
+  Info,
 } from "lucide-react";
 
 // Dynamically import xlsx for Excel handling
@@ -212,38 +213,52 @@ const defaultData = {
   cxFeedbackLog: [
     {
       site: "Hemel Hempstead",
-      issue:
-        "Fire alarm tests need to be recorded in file after tests. The quality of service does vary depending on who you get.",
+      issue: "Fire alarm tests need to be recorded in file after tests...",
       resolution:
-        "The GSF file should be completed by GSF following weekly tests. We have a completed job sheet for the monthly test which is shared with our risk assessor.",
+        "The GSF file should be completed by GSF following weekly tests...",
     },
     {
       site: "Castle Vale",
-      issue:
-        "Often we have no idea what they have turned up for, sometimes you can see 2/3 a week and often seem to stumble over each others work.",
+      issue: "Often we have no idea what they have turned up for...",
       resolution:
-        "Attended this site 23 times in 2025. We do combine where possible, for example, gas drop and boiler, roller shutter and POU were combined.",
+        "Attended this site 23 times in 2025. We do combine where possible...",
+    },
+  ],
+  // NEW: Dynamic Missed Tasks Log
+  missedTasksLog: [
+    {
+      team: "UKN Engineers",
+      site: "Henfield",
+      reason: "1 Monthly Flushing overlooked.",
     },
     {
+      team: "UKN Engineers",
+      site: "Northallerton",
+      reason: "6 Monthly Roller Shutter service.",
+    },
+    {
+      team: "Subcontractors",
+      site: "Belfast",
+      reason: "1 Monthly Fire Alarm (Site declined access).",
+    },
+    {
+      team: "Subcontractors",
+      site: "Newtownards",
+      reason: "1 Monthly Fire Alarm.",
+    },
+  ],
+  // NEW: Dynamic SLA Reasons Log
+  slaReasons: [
+    {
+      priority: "P2 (Urgent)",
       site: "Leeds West",
-      issue:
-        "Sometimes several UKN employees attend branch within a short timescale instead of consolidating into one visit.",
-      resolution:
-        "We do combine as much as possible. The only time we have attended twice in one week is when monthly PPMs were completed and then a separate reactive job was raised.",
+      reason: "Awaiting specialist parts from supplier. ETA +48h.",
     },
     {
+      priority: "P3 (Important)",
       site: "Bridgend",
-      issue:
-        "We can have checks done at the end of a month and then again the following week. Faulty equipment takes too long to be fixed.",
-      resolution:
-        "We have never completed the monthly visit this close together. The closest has been 20 days apart. Alarm resets escalated to UKSI.",
-    },
-    {
-      site: "Hayes",
-      issue:
-        "Alarm code resets take far too long. Had to wait weeks to get one reset recently.",
-      resolution:
-        "Most jobs resolved same day by phone or attended promptly (e.g. logged 13/10 8am, attended 14/10 12pm). 1 awaiting UKSI paperwork.",
+      reason:
+        "Engineer vehicle breakdown in transit. Rescheduled for next morning.",
     },
   ],
 };
@@ -257,52 +272,37 @@ const formatMoney = (val: number) =>
   }).format(val);
 
 // --- CUSTOM INTERACTIVE TOOLTIP ---
-const CustomTooltip = ({
-  active = false,
-  payload = [],
-  label = "",
-}: {
-  active?: boolean;
-  payload?: Array<{ name: string; value: number; color: string }>;
-  label?: string;
-}) => {
+const CustomTooltip = ({ active = false, payload = [], label = "" }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white/95 backdrop-blur-sm p-4 rounded-xl shadow-2xl border border-slate-100 transform transition-all z-50">
         <p className="font-bold text-slate-800 mb-2 border-b border-slate-100 pb-1">
           {label}
         </p>
-        {payload.map(
-          (
-            entry: { name: string; value: number; color: string },
-            index: number
-          ) => {
-            const isNum =
-              entry.name.includes("percent") ||
-              entry.name.includes("Resets") ||
-              entry.name.includes("Visits") ||
-              entry.name.includes("Tasks") ||
-              entry.name.includes("Due") ||
-              entry.name.includes("Completed");
-            return (
+        {payload.map((entry: any, index: number) => {
+          const isNum =
+            entry.name.includes("percent") ||
+            entry.name.includes("Resets") ||
+            entry.name.includes("Visits") ||
+            entry.name.includes("Tasks") ||
+            entry.name.includes("Due") ||
+            entry.name.includes("Completed");
+          return (
+            <div
+              key={index}
+              className="flex items-center space-x-3 text-sm my-1"
+            >
               <div
-                key={index}
-                className="flex items-center space-x-3 text-sm my-1"
-              >
-                <div
-                  className="w-3 h-3 rounded-full shadow-inner"
-                  style={{ backgroundColor: entry.color }}
-                ></div>
-                <span className="text-slate-600 font-medium">
-                  {entry.name}:
-                </span>
-                <span className="font-bold text-slate-900">
-                  {isNum ? entry.value : formatMoney(entry.value)}
-                </span>
-              </div>
-            );
-          }
-        )}
+                className="w-3 h-3 rounded-full shadow-inner"
+                style={{ backgroundColor: entry.color }}
+              ></div>
+              <span className="text-slate-600 font-medium">{entry.name}:</span>
+              <span className="font-bold text-slate-900">
+                {isNum ? entry.value : formatMoney(entry.value)}
+              </span>
+            </div>
+          );
+        })}
       </div>
     );
   }
@@ -329,16 +329,10 @@ const Card = ({
   gradientFrom,
   gradientTo,
   iconColor,
-  onClick = undefined,
+  onClick,
 }: CardProps) => {
-  const containerClass =
-    "bg-gradient-to-br rounded-3xl shadow-lg border border-white/40 p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl cursor-pointer relative overflow-hidden group " +
-    gradientFrom +
-    " " +
-    gradientTo;
-  const iconClass =
-    "w-8 h-8 transition-transform duration-300 group-hover:scale-110 " +
-    iconColor;
+  const containerClass = `bg-gradient-to-br rounded-3xl shadow-lg border border-white/40 p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl cursor-pointer relative overflow-hidden group ${gradientFrom} ${gradientTo}`;
+  const iconClass = `w-8 h-8 transition-transform duration-300 group-hover:scale-110 ${iconColor}`;
 
   return (
     <div className={containerClass} onClick={onClick}>
@@ -373,14 +367,21 @@ export default function App() {
 
   const {
     spendData,
-    aprilSpendBreakdown,
+    aprilSpendBreakdown, // Still used for pie chart data mapping
     intruder2026,
     slaPerformance,
     ppmBreakdown,
     topReactiveBranches2026,
     topIntruderBranches,
     cxFeedbackLog,
+    missedTasksLog,
+    slaReasons,
   } = data;
+
+  // DYNAMIC MONTH EXTRACTION for titles
+  const latestDataMonthStr =
+    spendData.length > 0 ? spendData[spendData.length - 1].month : "Month";
+  const latestMonthAbbr = latestDataMonthStr.split("-")[0]; // e.g., "Apr" or "May"
 
   const downloadTemplate = () => {
     if (!XLSX) {
@@ -391,7 +392,7 @@ export default function App() {
     try {
       const workbook = XLSX.utils.book_new();
 
-      // Add each data sheet
+      // Add each data sheet including new ones
       XLSX.utils.book_append_sheet(
         workbook,
         XLSX.utils.json_to_sheet(spendData),
@@ -400,7 +401,7 @@ export default function App() {
       XLSX.utils.book_append_sheet(
         workbook,
         XLSX.utils.json_to_sheet(aprilSpendBreakdown),
-        "April Breakdown"
+        "Monthly Breakdown"
       );
       XLSX.utils.book_append_sheet(
         workbook,
@@ -414,9 +415,19 @@ export default function App() {
       );
       XLSX.utils.book_append_sheet(
         workbook,
+        XLSX.utils.json_to_sheet(slaReasons),
+        "SLA Reasons"
+      ); // Added
+      XLSX.utils.book_append_sheet(
+        workbook,
         XLSX.utils.json_to_sheet(ppmBreakdown),
         "PPM Breakdown"
       );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(missedTasksLog),
+        "Missed Tasks"
+      ); // Added
       XLSX.utils.book_append_sheet(
         workbook,
         XLSX.utils.json_to_sheet(topReactiveBranches2026),
@@ -433,12 +444,10 @@ export default function App() {
         "CX Feedback"
       );
 
-      // Generate filename with timestamp
       const now = new Date();
       const timestamp = now.toISOString().split("T")[0];
       const filename = `GSF_BusinessReview_Template_${timestamp}.xlsx`;
 
-      // Write file
       XLSX.writeFile(workbook, filename);
     } catch (error) {
       console.error("Error downloading template:", error);
@@ -464,8 +473,8 @@ export default function App() {
     try {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: "binary" });
+        const fileData = e.target?.result;
+        const workbook = XLSX.read(fileData, { type: "binary" });
 
         const sheetNames = workbook.SheetNames;
         const newData: any = { ...data };
@@ -473,10 +482,12 @@ export default function App() {
         // Map sheet names to data keys
         const sheetMap: { [key: string]: string } = {
           "Spend Data": "spendData",
-          "April Breakdown": "aprilSpendBreakdown",
+          "Monthly Breakdown": "aprilSpendBreakdown", // Kept old key name for stability, changed sheet name to be generic
           "Intruder 2026": "intruder2026",
           "SLA Performance": "slaPerformance",
+          "SLA Reasons": "slaReasons", // Added mapping
           "PPM Breakdown": "ppmBreakdown",
+          "Missed Tasks": "missedTasksLog", // Added mapping
           "Top Reactive": "topReactiveBranches2026",
           "Top Intruder": "topIntruderBranches",
           "CX Feedback": "cxFeedbackLog",
@@ -502,7 +513,6 @@ export default function App() {
       alert("Error uploading template. Please check the file format.");
     }
 
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -515,6 +525,10 @@ export default function App() {
     { id: "operations", label: "Operations & SLAs", icon: Zap },
     { id: "cx", label: "Customer Experience", icon: Users },
   ];
+
+  // Helper for grouping missed tasks by team
+  const uknMissedTasks = missedTasksLog.filter((t) => t.team.includes("UKN"));
+  const subMissedTasks = missedTasksLog.filter((t) => !t.team.includes("UKN"));
 
   return (
     <div className="min-h-screen bg-[#f1f5f9] font-sans text-slate-900 pb-12">
@@ -540,13 +554,12 @@ export default function App() {
                 GSF Business Review
               </h1>
               <p className="text-xs font-bold text-red-600 tracking-widest uppercase mt-0.5">
-                May 2026 • UK National Ltd
+                {latestDataMonthStr} • UK National Ltd
               </p>
             </div>
           </div>
 
           <div className="flex flex-col xl:flex-row items-center space-y-4 xl:space-y-0 xl:space-x-4">
-            {/* EXCEL ACTIONS */}
             <div className="flex space-x-2">
               <button
                 onClick={downloadTemplate}
@@ -563,8 +576,6 @@ export default function App() {
                 <Upload className="w-4 h-4" />
                 <span className="hidden sm:inline">Upload Excel</span>
               </button>
-
-              {/* Hidden file input */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -611,8 +622,8 @@ export default function App() {
           <div className="space-y-8 animate-[fadeIn_0.5s_ease-out]">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card
-                title="Total Spend (Apr)"
-                value={formatMoney(spendData[spendData.length - 1].total)}
+                title={`Total Spend (${latestMonthAbbr})`}
+                value={formatMoney(spendData[spendData.length - 1]?.total || 0)}
                 subtext="▼ Down from Last Mo."
                 icon={DollarSign}
                 gradientFrom="from-blue-50"
@@ -622,7 +633,7 @@ export default function App() {
               />
               <Card
                 title="PPM Completion"
-                value={ppmBreakdown[0]?.percent + "%"}
+                value={(ppmBreakdown[0]?.percent || 0) + "%"}
                 subtext="UKN Engineers"
                 icon={CheckCircle2}
                 gradientFrom="from-emerald-50"
@@ -632,7 +643,7 @@ export default function App() {
               />
               <Card
                 title="P1 Compliance"
-                value={slaPerformance[0]?.percent + "%"}
+                value={(slaPerformance[0]?.percent || 0) + "%"}
                 subtext="Emergency SLA"
                 icon={Clock}
                 gradientFrom="from-indigo-50"
@@ -735,11 +746,7 @@ export default function App() {
                         strokeWidth={4}
                         fill="url(#colorTotalActive)"
                         name="Total Spend"
-                        activeDot={{
-                          r: 8,
-                          strokeWidth: 3,
-                          stroke: "#fff",
-                        }}
+                        activeDot={{ r: 8, strokeWidth: 3, stroke: "#fff" }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -751,7 +758,7 @@ export default function App() {
                   Latest Breakdown
                 </h3>
                 <p className="text-sm font-medium text-slate-500 mb-6">
-                  Spend allocation
+                  Spend allocation for {latestMonthAbbr}
                 </p>
                 <div className="h-[320px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -775,15 +782,7 @@ export default function App() {
                           />
                         ))}
                       </Pie>
-                      <Tooltip
-                        content={
-                          <CustomTooltip
-                            active={undefined}
-                            payload={undefined}
-                            label={undefined}
-                          />
-                        }
-                      />
+                      <Tooltip content={<CustomTooltip />} />
                       <Legend
                         verticalAlign="bottom"
                         iconType="circle"
@@ -928,13 +927,7 @@ export default function App() {
                       dx={-10}
                     />
                     <Tooltip
-                      content={
-                        <CustomTooltip
-                          active={undefined}
-                          payload={undefined}
-                          label={undefined}
-                        />
-                      }
+                      content={<CustomTooltip />}
                       cursor={{ fill: "rgba(241, 245, 249, 0.5)" }}
                     />
                     <Area
@@ -1101,13 +1094,7 @@ export default function App() {
                         tick={{ fill: "#64748b", fontWeight: 600 }}
                       />
                       <Tooltip
-                        content={
-                          <CustomTooltip
-                            active={undefined}
-                            payload={undefined}
-                            label={undefined}
-                          />
-                        }
+                        content={<CustomTooltip />}
                         cursor={{ fill: "#f8fafc" }}
                       />
                       <Legend
@@ -1132,6 +1119,7 @@ export default function App() {
                 </div>
               </div>
 
+              {/* DYNAMIC MISSED TASKS */}
               <div className="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 relative overflow-hidden">
                 <div className="absolute right-0 top-0 w-32 h-32 bg-rose-50 rounded-bl-full -z-10"></div>
                 <div className="flex items-center space-x-3 mb-8 border-b border-slate-100 pb-4">
@@ -1144,54 +1132,55 @@ export default function App() {
                 </div>
 
                 <div className="space-y-6">
-                  <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm">
-                    <div className="flex items-center space-x-2 mb-3">
-                      <div className="w-2 h-6 bg-blue-500 rounded-full"></div>
-                      <p className="text-sm font-black text-blue-700 uppercase tracking-wider">
-                        UKN Engineers (2 Missed)
-                      </p>
+                  {uknMissedTasks.length > 0 && (
+                    <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm">
+                      <div className="flex items-center space-x-2 mb-3">
+                        <div className="w-2 h-6 bg-blue-500 rounded-full"></div>
+                        <p className="text-sm font-black text-blue-700 uppercase tracking-wider">
+                          UKN Engineers ({uknMissedTasks.length} Missed)
+                        </p>
+                      </div>
+                      <ul className="text-sm space-y-3 text-slate-700 font-medium">
+                        {uknMissedTasks.map((task, idx) => (
+                          <li key={idx} className="flex items-start">
+                            <span className="text-blue-500 mr-2 mt-0.5">•</span>
+                            <span>
+                              <strong>{task.site}:</strong> {task.reason}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <ul className="text-sm space-y-3 text-slate-700 font-medium">
-                      <li className="flex items-start">
-                        <span className="text-blue-500 mr-2 mt-0.5">•</span>
-                        <span>
-                          <strong>Henfield:</strong> 1 Monthly Flushing
-                          overlooked.
-                        </span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="text-blue-500 mr-2 mt-0.5">•</span>
-                        <span>
-                          <strong>Northallerton:</strong> 6 Monthly Roller
-                          Shutter service.
-                        </span>
-                      </li>
-                    </ul>
-                  </div>
+                  )}
 
-                  <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm">
-                    <div className="flex items-center space-x-2 mb-3">
-                      <div className="w-2 h-6 bg-amber-500 rounded-full"></div>
-                      <p className="text-sm font-black text-amber-700 uppercase tracking-wider">
-                        Subcontractors (3 Missed)
-                      </p>
+                  {subMissedTasks.length > 0 && (
+                    <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm">
+                      <div className="flex items-center space-x-2 mb-3">
+                        <div className="w-2 h-6 bg-amber-500 rounded-full"></div>
+                        <p className="text-sm font-black text-amber-700 uppercase tracking-wider">
+                          Subcontractors ({subMissedTasks.length} Missed)
+                        </p>
+                      </div>
+                      <ul className="text-sm space-y-3 text-slate-700 font-medium">
+                        {subMissedTasks.map((task, idx) => (
+                          <li key={idx} className="flex items-start">
+                            <span className="text-amber-500 mr-2 mt-0.5">
+                              •
+                            </span>
+                            <span>
+                              <strong>{task.site}:</strong> {task.reason}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <ul className="text-sm space-y-3 text-slate-700 font-medium">
-                      <li className="flex items-start">
-                        <span className="text-amber-500 mr-2 mt-0.5">•</span>
-                        <span>
-                          <strong>Belfast:</strong> 1 Monthly Fire Alarm (Site
-                          declined access).
-                        </span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="text-amber-500 mr-2 mt-0.5">•</span>
-                        <span>
-                          <strong>Newtownards:</strong> 1 Monthly Fire Alarm.
-                        </span>
-                      </li>
-                    </ul>
-                  </div>
+                  )}
+
+                  {missedTasksLog.length === 0 && (
+                    <div className="p-6 text-center text-slate-500 font-medium">
+                      No missed tasks recorded for this period.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1245,13 +1234,7 @@ export default function App() {
                         dx={10}
                       />
                       <Tooltip
-                        content={
-                          <CustomTooltip
-                            active={undefined}
-                            payload={undefined}
-                            label={undefined}
-                          />
-                        }
+                        content={<CustomTooltip />}
                         cursor={{ fill: "#f8fafc" }}
                       />
                       <Legend
@@ -1295,7 +1278,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8 hover:shadow-2xl transition-shadow duration-300">
+              <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8 hover:shadow-2xl transition-shadow duration-300 flex flex-col">
                 <div className="flex justify-between items-center mb-8">
                   <div>
                     <h3 className="text-2xl font-black text-slate-800 tracking-tight">
@@ -1310,7 +1293,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="space-y-7 mt-4">
+                <div className="space-y-7">
                   {slaPerformance.map((item, idx) => {
                     const barColor =
                       item.percent >= 90
@@ -1351,6 +1334,38 @@ export default function App() {
                     );
                   })}
                 </div>
+
+                {/* NEW DYNAMIC SLA REASONS LOG */}
+                {slaReasons.length > 0 && (
+                  <div className="mt-8 pt-6 border-t border-slate-100">
+                    <div className="flex items-center space-x-2 mb-4 text-slate-700">
+                      <Info className="w-5 h-5 text-indigo-500" />
+                      <h4 className="font-bold tracking-tight">
+                        Exceptions Log
+                      </h4>
+                    </div>
+                    <div className="space-y-3">
+                      {slaReasons.map((reason, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-slate-50 border border-slate-200 p-4 rounded-xl shadow-sm text-sm"
+                        >
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-bold text-slate-800">
+                              {reason.site}
+                            </span>
+                            <span className="text-xs font-black text-indigo-600 uppercase bg-indigo-50 px-2 py-0.5 rounded-md">
+                              {reason.priority}
+                            </span>
+                          </div>
+                          <p className="text-slate-600 font-medium">
+                            {reason.reason}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
